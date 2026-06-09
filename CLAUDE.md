@@ -33,7 +33,9 @@ whats-next/
 
 ## Running the App
 
-> Commands will be added here once the dev setup is finalized.
+Frontend: cd frontend && npm run dev  (runs on localhost:5173)
+Backend: cd backend && python -m uvicorn main:app --reload  (runs on localhost:8000)
+Note: use "python -m uvicorn" instead of just "uvicorn" on Windows
 
 ## Common commands
    - frontend: cd frontend && npm run dev
