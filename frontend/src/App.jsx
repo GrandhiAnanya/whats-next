@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 // Genre mood pills the user can click to quickly fill in the search box
 const GENRES = ['Fiction', 'Mystery', 'Biography', 'Sci-Fi', 'Romance']
@@ -7,7 +7,8 @@ const GENRES = ['Fiction', 'Mystery', 'Biography', 'Sci-Fi', 'Romance']
 function Navbar() {
   return (
     <nav style={styles.navbar}>
-      <span style={styles.navBrand}>What's Next?</span>
+      <span style={styles.navBrand}> <i className="fas fa-leaf" style={{marginRight: '8px', fontSize: '1.2rem'}}></i>
+       What's Next?</span>
       <div style={styles.navLinks}>
         <a href="#" style={styles.navLink}>My Library</a>
         <a href="#" style={styles.navLink}>What's Next</a>
@@ -51,6 +52,39 @@ function App() {
   // State: an error message to show if something goes wrong
   const [error, setError] = useState('')
 
+  // ── Floating petals ──────────────────────────────────────────────────────────
+  // useEffect runs once after the component mounts (the empty [] means "run once")
+  // setInterval creates a new petal every 2200ms; each petal floats down and is
+  // removed after 20s to avoid the DOM filling up with invisible elements
+  useEffect(() => {
+    const container = document.getElementById('petal-container')
+    const interval = setInterval(() => {
+      const petal = document.createElement('div')
+      const size     = 6 + Math.random() * 12          // random size 6–18px
+      const left     = Math.random() * 100              // random horizontal position
+      const duration = 10 + Math.random() * 12         // fall speed 10–22s
+      const delay    = Math.random() * 15              // stagger start 0–15s
+      const opacity  = (0.2 + Math.random() * 0.4).toFixed(2)  // 0.2–0.6
+
+      petal.className = 'petal'
+      petal.style.cssText = `
+        width: ${size}px;
+        height: ${size}px;
+        left: ${left}%;
+        top: -20px;
+        background: rgba(201,174,124,${opacity});
+        border-radius: 80% 0 80% 0;
+        animation-duration: ${duration}s;
+        animation-delay: ${delay}s;
+      `
+      container.appendChild(petal)
+      setTimeout(() => petal.remove(), 20000)
+    }, 2200)
+
+    // Cleanup: stop creating petals if the component ever unmounts
+    return () => clearInterval(interval)
+  }, [])
+
   // Called when the user clicks "Get Recommendations"
   // async/await lets us write async code that reads like normal sequential code
   async function fetchRecommendations() {
@@ -92,6 +126,7 @@ function App() {
       <main style={styles.main}>
         {/* ── Page heading ── */}
         <h1 style={styles.heading}>What's Next?</h1>
+        <br></br>
         <p style={styles.subheading}>
           Enter a book you've enjoyed and we'll find your next read.
         </p>
@@ -146,25 +181,31 @@ function App() {
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
-// Inline style objects — keeps everything in one file while we're prototyping
 const styles = {
   page: {
     minHeight: '100vh',
-    backgroundColor: '#FAF8F5',
-    fontFamily: "'Georgia', serif",
-    color: '#2c2c2c',
+    background: 'transparent',
+    fontFamily: "'Lora', serif",
+    color: '#3D3A36',
+    position: 'relative',
+    zIndex: 10,
   },
   navbar: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '18px 40px',
-    borderBottom: '1px solid #e8e3db',
-    backgroundColor: '#FAF8F5',
+    padding: '22px 48px',
+    borderBottom: '1px solid #EADBCF',
+    backgroundColor: 'transparent',
+    maxWidth: '1000px',       
+    margin: '0 auto',        
+    width: '100%',
   },
   navBrand: {
-    fontSize: '1.3rem',
-    fontWeight: 'bold',
+    fontFamily: "'Playfair Display', serif",
+    fontSize: '1.8rem',
+    fontWeight: '600',
+    color: '#6F5B47',
     letterSpacing: '0.5px',
   },
   navLinks: {
@@ -173,62 +214,75 @@ const styles = {
   },
   navLink: {
     textDecoration: 'none',
-    color: '#555',
+    color: '#6F5B47',
     fontSize: '0.95rem',
   },
   main: {
-    maxWidth: '760px',
+    maxWidth: '1000px',
     margin: '0 auto',
-    padding: '60px 24px',
+    padding: '60px 80px',
+    textAlign: 'center',
   },
   heading: {
-    fontSize: '2.2rem',
-    fontWeight: 'bold',
-    marginBottom: '8px',
+    fontFamily: "'Playfair Display', serif",
+    fontSize: '3.8rem',
+    fontWeight: '600',
+    color: '#5F4C3B',
+    marginBottom: '16px',
+    textTransform: 'lowercase',
   },
   subheading: {
-    color: '#666',
-    marginBottom: '32px',
-    fontSize: '1rem',
+    fontStyle: 'italic',
+    color: '#8B775E',
+    marginBottom: '40px',
+    fontSize: '1.2rem',
+    marginTop: '16px',
   },
   searchRow: {
     display: 'flex',
     gap: '12px',
     marginBottom: '16px',
+    maxWidth: '720px',     
+    margin: '0 auto 16px',
   },
   input: {
     flex: 1,
     padding: '12px 16px',
     fontSize: '1rem',
-    border: '1px solid #d8d2c8',
-    borderRadius: '8px',
+    border: '1px solid #EADBCF',
+    borderRadius: '50px',
     backgroundColor: '#fff',
     outline: 'none',
+    fontFamily: "'Lora', serif",
+    color: '#3D3A36',
   },
   button: {
-    padding: '12px 22px',
-    fontSize: '0.95rem',
-    backgroundColor: '#3d3530',
+    padding: '8px 14px',
+    fontSize: '0.78rem',
+    backgroundColor: '#6F5B47',
     color: '#fff',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '50px',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
+    fontFamily: "'Lora', serif",
   },
   pillRow: {
     display: 'flex',
     gap: '10px',
     flexWrap: 'wrap',
     marginBottom: '36px',
+    justifyContent: 'center',
   },
   pill: {
     padding: '7px 16px',
     fontSize: '0.85rem',
-    backgroundColor: '#ede8e0',
-    border: '1px solid #d8d2c8',
+    backgroundColor: '#F5EBD9',
+    border: '1px solid #EADBCF',
     borderRadius: '20px',
     cursor: 'pointer',
-    color: '#3d3530',
+    color: '#6F5B47',
+    fontFamily: "'Lora', serif",
   },
   feedback: {
     textAlign: 'center',
@@ -239,7 +293,11 @@ const styles = {
     fontSize: '1.2rem',
     fontWeight: 'bold',
     marginBottom: '20px',
-    color: '#3d3530',
+    color: '#5F4C3B',
+    textAlign: 'left',
+    borderLeft: '4px solid #C9AE7C',  
+    paddingLeft: '12px',               
+    textTransform: 'lowercase',
   },
   grid: {
     display: 'grid',
@@ -247,10 +305,11 @@ const styles = {
     gap: '20px',
   },
   card: {
-    backgroundColor: '#fff',
-    border: '1px solid #e8e3db',
-    borderRadius: '10px',
+    backgroundColor: '#FFFDF9',
+    border: '1px solid #EADBCF',
+    borderRadius: '16px',
     overflow: 'hidden',
+    textAlign: 'left',
   },
   thumbnail: {
     width: '100%',
@@ -260,7 +319,7 @@ const styles = {
   thumbnailPlaceholder: {
     width: '100%',
     height: '200px',
-    backgroundColor: '#ede8e0',
+    backgroundColor: '#F5EBD9',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -271,18 +330,22 @@ const styles = {
     padding: '12px',
   },
   cardTitle: {
-    fontWeight: 'bold',
+    fontWeight: '500',
     fontSize: '0.95rem',
     marginBottom: '4px',
+    color: '#3D3A36',
   },
   cardMeta: {
     fontSize: '0.8rem',
-    color: '#777',
+    color: '#8B775E',
     margin: '2px 0',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
   },
   cardRating: {
     fontSize: '0.85rem',
-    color: '#b07d3a',
+    color: '#C9AE7C',
     marginTop: '6px',
   },
 }
