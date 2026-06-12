@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
+import { auth } from './firebase'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
+import Auth from './Auth'
 
 // Genre mood pills the user can click to quickly fill in the search box
 const GENRES = ['Fiction', 'Mystery', 'Biography', 'Sci-Fi', 'Romance']
 
 // ── Navbar ────────────────────────────────────────────────────────────────────
-function Navbar() {
+function Navbar({ user, onSignOut }) {
   return (
     <nav style={styles.navbar}>
       <span style={styles.navBrand}> <i className="fas fa-leaf" style={{marginRight: '8px', fontSize: '1.2rem'}}></i>
@@ -13,6 +16,8 @@ function Navbar() {
         <a href="#" style={styles.navLink}>My Library</a>
         <a href="#" style={styles.navLink}>What's Next</a>
         <a href="#" style={styles.navLink}>Popular</a>
+        <span style={styles.navLink}>👤 {user?.displayName || user?.email}</span>
+        <button style={styles.signOutBtn} onClick={onSignOut}>Sign Out</button>
       </div>
     </nav>
   )
@@ -51,6 +56,20 @@ function App() {
   const [loading, setLoading] = useState(false)
   // State: an error message to show if something goes wrong
   const [error, setError] = useState('')
+  // State: the currently signed-in Firebase user (null means not logged in)
+  const [user, setUser] = useState(null)
+
+  // ── Auth listener ─────────────────────────────────────────────────────────
+  // onAuthStateChanged fires whenever the user signs in or out — keeps `user` in sync
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser)
+    })
+    return () => unsubscribe()  // stop listening when the component unmounts
+  }, [])
+
+  // Show the Auth screen until Firebase confirms a signed-in user
+  
 
   // ── Floating petals ──────────────────────────────────────────────────────────
   // useEffect runs once after the component mounts (the empty [] means "run once")
@@ -84,6 +103,8 @@ function App() {
     // Cleanup: stop creating petals if the component ever unmounts
     return () => clearInterval(interval)
   }, [])
+
+  if (!user) return <Auth />
 
   // Called when the user clicks "Get Recommendations"
   // async/await lets us write async code that reads like normal sequential code
@@ -121,7 +142,7 @@ function App() {
 
   return (
     <div style={styles.page}>
-      <Navbar />
+      <Navbar user={user} onSignOut={() => signOut(auth)} />
 
       <main style={styles.main}>
         {/* ── Page heading ── */}
@@ -182,6 +203,17 @@ function App() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = {
+  signOutBtn: {
+    padding: '6px 14px',
+    backgroundColor: 'transparent',
+    border: '1px solid #EADBCF',
+    borderRadius: '50px',
+    cursor: 'pointer',
+    color: '#6F5B47',
+    fontFamily: "'Lora', serif",
+    fontSize: '0.8rem',
+  },
+
   page: {
     minHeight: '100vh',
     background: 'transparent',
