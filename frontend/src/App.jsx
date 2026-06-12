@@ -1,23 +1,68 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { auth } from './firebase'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import Auth from './Auth'
+import Profile from './Profile'
 
 // Genre mood pills the user can click to quickly fill in the search box
 const GENRES = ['Fiction', 'Mystery', 'Biography', 'Sci-Fi', 'Romance']
 
 // ── Navbar ────────────────────────────────────────────────────────────────────
-function Navbar({ user, onSignOut }) {
+function Navbar({ user, onSignOut, onProfile }) {
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const avatarRef = useRef(null)
+
+  // Close the dropdown when the user clicks anywhere outside the avatar area
+  useEffect(() => {
+    function handleOutsideClick(e) {
+      if (avatarRef.current && !avatarRef.current.contains(e.target)) {
+        setDropdownOpen(false)
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener('click', handleOutsideClick)
+    }
+    return () => document.removeEventListener('click', handleOutsideClick)
+  }, [dropdownOpen])
+
+  const initial =
+    user?.displayName?.[0]?.toUpperCase() ||
+    user?.email?.[0]?.toUpperCase() ||
+    '?'
+
   return (
     <nav style={styles.navbar}>
-      <span style={styles.navBrand}> <i className="fas fa-leaf" style={{marginRight: '8px', fontSize: '1.2rem'}}></i>
-       What's Next?</span>
+      {/* ── Avatar button + dropdown (left side) ── */}
+      <div ref={avatarRef} style={{ position: 'relative' }}>
+        <button
+          style={styles.avatarButton}
+          onClick={() => setDropdownOpen((prev) => !prev)}
+        >
+          {initial}
+        </button>
+        {dropdownOpen && (
+          <div style={styles.dropdown}>
+            <button
+              style={styles.dropdownItem}
+              onClick={() => { onProfile(); setDropdownOpen(false) }}
+            >
+              Profile
+            </button>
+            <button
+              style={styles.dropdownItem}
+              onClick={() => { onSignOut(); setDropdownOpen(false) }}
+            >
+              Sign Out
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Nav links (right side) ── */}
       <div style={styles.navLinks}>
         <a href="#" style={styles.navLink}>My Library</a>
         <a href="#" style={styles.navLink}>What's Next</a>
         <a href="#" style={styles.navLink}>Popular</a>
-        <span style={styles.navLink}>👤 {user?.displayName || user?.email}</span>
-        <button style={styles.signOutBtn} onClick={onSignOut}>Sign Out</button>
       </div>
     </nav>
   )
@@ -58,6 +103,7 @@ function App() {
   const [error, setError] = useState('')
   // State: the currently signed-in Firebase user (null means not logged in)
   const [user, setUser] = useState(null)
+  const [showProfile, setShowProfile] = useState(false)
 
   // ── Auth listener ─────────────────────────────────────────────────────────
   // onAuthStateChanged fires whenever the user signs in or out — keeps `user` in sync
@@ -69,7 +115,7 @@ function App() {
   }, [])
 
   // Show the Auth screen until Firebase confirms a signed-in user
-  
+
 
   // ── Floating petals ──────────────────────────────────────────────────────────
   // useEffect runs once after the component mounts (the empty [] means "run once")
@@ -79,11 +125,11 @@ function App() {
     const container = document.getElementById('petal-container')
     const interval = setInterval(() => {
       const petal = document.createElement('div')
-      const size     = 6 + Math.random() * 12          // random size 6–18px
-      const left     = Math.random() * 100              // random horizontal position
+      const size = 6 + Math.random() * 12          // random size 6–18px
+      const left = Math.random() * 100              // random horizontal position
       const duration = 10 + Math.random() * 12         // fall speed 10–22s
-      const delay    = Math.random() * 15              // stagger start 0–15s
-      const opacity  = (0.2 + Math.random() * 0.4).toFixed(2)  // 0.2–0.6
+      const delay = Math.random() * 15              // stagger start 0–15s
+      const opacity = (0.2 + Math.random() * 0.4).toFixed(2)  // 0.2–0.6
 
       petal.className = 'petal'
       petal.style.cssText = `
@@ -105,6 +151,10 @@ function App() {
   }, [])
 
   if (!user) return <Auth />
+
+  if (showProfile) {
+    return <Profile user={user} onBack={() => setShowProfile(false)} />
+  }
 
   // Called when the user clicks "Get Recommendations"
   // async/await lets us write async code that reads like normal sequential code
@@ -142,7 +192,11 @@ function App() {
 
   return (
     <div style={styles.page}>
-      <Navbar user={user} onSignOut={() => signOut(auth)} />
+      <Navbar
+        user={user}
+        onSignOut={() => signOut(auth)}
+        onProfile={() => setShowProfile(true)}
+      />
 
       <main style={styles.main}>
         {/* ── Page heading ── */}
@@ -203,15 +257,44 @@ function App() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = {
-  signOutBtn: {
-    padding: '6px 14px',
-    backgroundColor: 'transparent',
-    border: '1px solid #EADBCF',
-    borderRadius: '50px',
+  avatarButton: {
+    width: '38px',
+    height: '38px',
+    borderRadius: '50%',
+    backgroundColor: '#C9AE7C',
+    color: '#fff',
+    border: 'none',
     cursor: 'pointer',
-    color: '#6F5B47',
     fontFamily: "'Lora', serif",
-    fontSize: '0.8rem',
+    fontSize: '1rem',
+    fontWeight: '600',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dropdown: {
+    position: 'absolute',
+    top: '48px',
+    left: '0',
+    background: '#FFFDF9',
+    border: '1px solid #EADBCF',
+    borderRadius: '12px',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+    zIndex: 100,
+    minWidth: '140px',
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    display: 'block',
+    width: '100%',
+    padding: '11px 16px',
+    background: 'none',
+    border: 'none',
+    textAlign: 'left',
+    cursor: 'pointer',
+    fontFamily: "'Lora', serif",
+    fontSize: '0.9rem',
+    color: '#6F5B47',
   },
 
   page: {
@@ -229,16 +312,9 @@ const styles = {
     padding: '22px 48px',
     borderBottom: '1px solid #EADBCF',
     backgroundColor: 'transparent',
-    maxWidth: '1000px',       
-    margin: '0 auto',        
+    maxWidth: '1000px',
+    margin: '0 auto',
     width: '100%',
-  },
-  navBrand: {
-    fontFamily: "'Playfair Display', serif",
-    fontSize: '1.8rem',
-    fontWeight: '600',
-    color: '#6F5B47',
-    letterSpacing: '0.5px',
   },
   navLinks: {
     display: 'flex',
@@ -274,7 +350,7 @@ const styles = {
     display: 'flex',
     gap: '12px',
     marginBottom: '16px',
-    maxWidth: '720px',     
+    maxWidth: '720px',
     margin: '0 auto 16px',
   },
   input: {
@@ -327,8 +403,8 @@ const styles = {
     marginBottom: '20px',
     color: '#5F4C3B',
     textAlign: 'left',
-    borderLeft: '4px solid #C9AE7C',  
-    paddingLeft: '12px',               
+    borderLeft: '4px solid #C9AE7C',
+    paddingLeft: '12px',
     textTransform: 'lowercase',
   },
   grid: {

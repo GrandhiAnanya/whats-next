@@ -55,6 +55,7 @@ function Auth() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
+    <div style={styles.page}>
     <div style={styles.container}>
       <h2 style={styles.heading}>{isSignUp ? 'Create an Account' : 'Welcome Back'}</h2>
       <p style={styles.subheading}>{isSignUp ? 'Join to save your library.' : 'Sign in to your library.'}</p>
@@ -105,15 +106,25 @@ function Auth() {
         </button>
       </p>
     </div>
+    </div>
   )
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = {
+  page: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'transparent',
+  },
+  
   container: {
-    maxWidth: '400px',
-    margin: '60px auto',
-    padding: '40px',
+    maxWidth: '560px',
+    width: '90%',
+    margin: '40px auto',
+    padding: '60px 56px',
     background: 'rgba(255,253,249,0.95)',
     border: '1px solid #EADBCF',
     borderRadius: '16px',
@@ -166,13 +177,13 @@ const styles = {
     gap: '12px',
   },
   input: {
-    padding: '12px 16px',
-    fontSize: '1rem',
+    padding: '10px 16px',
+    fontSize: '0.85rem',
     border: '1px solid #EADBCF',
     borderRadius: '50px',
     outline: 'none',
     fontFamily: "'Lora', serif",
-    color: '#3D3A36',
+    color: '#6F5B47',
     backgroundColor: '#fff',
   },
   submitButton: {
