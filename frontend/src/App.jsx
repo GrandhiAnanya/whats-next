@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
-import { auth } from './firebase'
+import { auth, db } from './firebase'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
+import { collection, setDoc, getDocs, doc } from 'firebase/firestore'
 import Auth from './Auth'
 import Profile from './Profile'
+import Library from './Library'
 
 // Genre mood pills the user can click to quickly fill in the search box
 const GENRES = ['Fiction', 'Mystery', 'Biography', 'Sci-Fi', 'Romance']
 
 // ── Navbar ────────────────────────────────────────────────────────────────────
-function Navbar({ user, onSignOut, onProfile }) {
+function Navbar({ user, onSignOut, onProfile, onLibrary }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const avatarRef = useRef(null)
 
@@ -60,7 +62,7 @@ function Navbar({ user, onSignOut, onProfile }) {
 
       {/* ── Nav links (right side) ── */}
       <div style={styles.navLinks}>
-        <a href="#" style={styles.navLink}>My Library</a>
+        <span style={{ ...styles.navLink, cursor: 'pointer' }} onClick={onLibrary}> My Library </span>
         <a href="#" style={styles.navLink}>What's Next</a>
         <a href="#" style={styles.navLink}>Popular</a>
       </div>
@@ -70,7 +72,7 @@ function Navbar({ user, onSignOut, onProfile }) {
 
 // ── Book Card ─────────────────────────────────────────────────────────────────
 // Displays a single recommendation result
-function BookCard({ book }) {
+function BookCard({ book, onSave, isSaved }) {
   return (
     <div style={styles.card}>
       {/* Show the cover image if available, otherwise a placeholder */}
@@ -86,6 +88,13 @@ function BookCard({ book }) {
         {book.average_rating && (
           <p style={styles.cardRating}>★ {book.average_rating}</p>
         )}
+        <button
+          style={isSaved ? styles.savedButton : styles.saveButton}
+          onClick={onSave}
+          disabled={isSaved}
+        >
+          {isSaved ? 'Saved ✓' : 'Save to Library'}
+        </button>
       </div>
     </div>
   )
@@ -103,13 +112,17 @@ function App() {
   const [error, setError] = useState('')
   // State: the currently signed-in Firebase user (null means not logged in)
   const [user, setUser] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
   const [showProfile, setShowProfile] = useState(false)
-
+  // State: books the user has saved to their library
+  const [library, setLibrary] = useState([])
+  const [showLibrary, setShowLibrary] = useState(false)
   // ── Auth listener ─────────────────────────────────────────────────────────
   // onAuthStateChanged fires whenever the user signs in or out — keeps `user` in sync
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser)
+      setAuthLoading(false)
     })
     return () => unsubscribe()  // stop listening when the component unmounts
   }, [])
@@ -123,6 +136,7 @@ function App() {
   // removed after 20s to avoid the DOM filling up with invisible elements
   useEffect(() => {
     const container = document.getElementById('petal-container')
+    if (!container) return 
     const interval = setInterval(() => {
       const petal = document.createElement('div')
       const size = 6 + Math.random() * 12          // random size 6–18px
@@ -150,10 +164,61 @@ function App() {
     return () => clearInterval(interval)
   }, [])
 
+  useEffect(() => {
+    if (!user?.uid) return
+    async function fetchLibrary() {
+      const snapshot = await getDocs(collection(db, 'users', user.uid, 'library'))
+      setLibrary(snapshot.docs.map((d) => d.data()))
+    }
+    fetchLibrary()
+  }, [user?.uid])
+
+  if (authLoading) return (
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: "'Lora', serif",
+      color: '#8B775E',
+      fontSize: '1rem',
+      fontStyle: 'italic',
+      background: 'transparent'
+    }}>
+      Opening your library...
+    </div>
+  )
   if (!user) return <Auth />
+
+  // ── Library fetch ──────────────────────────────────────────────────────────
+  // Runs once after sign-in; reads all saved books from Firestore into state.
+  // user.uid is the unique Firebase ID for the signed-in user.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+
+
+  // Saves a book to Firestore and updates local state immediately so the button
+  // switches to "Saved ✓" without waiting for a re-fetch.
+  async function saveBook(book) {
+    const bookDoc = doc(db, 'users', user.uid, 'library', book.title)
+    const bookData = {
+      title: book.title,
+      authors: book.authors,
+      categories: book.categories,
+      thumbnail: book.thumbnail || null,
+      status: 'want_to_read',   
+      rating: null,
+      addedAt: new Date(),
+    }
+    await setDoc(bookDoc, bookData)
+    setLibrary((prev) => [...prev, bookData])
+  }
 
   if (showProfile) {
     return <Profile user={user} onBack={() => setShowProfile(false)} />
+  }
+
+  if (showLibrary) {
+    return <Library user={user} onBack={() => setShowLibrary(false)} />
   }
 
   // Called when the user clicks "Get Recommendations"
@@ -196,6 +261,7 @@ function App() {
         user={user}
         onSignOut={() => signOut(auth)}
         onProfile={() => setShowProfile(true)}
+        onLibrary={() => setShowLibrary(true)}
       />
 
       <main style={styles.main}>
@@ -245,7 +311,12 @@ function App() {
             <h2 style={styles.resultsHeading}>Your Next Reads</h2>
             <div style={styles.grid}>
               {recommendations.map((book, i) => (
-                <BookCard key={i} book={book} />
+                <BookCard
+                  key={i}
+                  book={book}
+                  isSaved={library.some((b) => b.title === book.title)}
+                  onSave={() => saveBook(book)}
+                />
               ))}
             </div>
           </div>
@@ -455,6 +526,28 @@ const styles = {
     fontSize: '0.85rem',
     color: '#C9AE7C',
     marginTop: '6px',
+  },
+  saveButton: {
+    marginTop: '10px',
+    padding: '6px 14px',
+    fontSize: '0.78rem',
+    backgroundColor: '#6F5B47',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '50px',
+    cursor: 'pointer',
+    fontFamily: "'Lora', serif",
+  },
+  savedButton: {
+    marginTop: '10px',
+    padding: '6px 14px',
+    fontSize: '0.78rem',
+    backgroundColor: 'transparent',
+    color: '#8B775E',
+    border: '1px solid #EADBCF',
+    borderRadius: '50px',
+    cursor: 'default',
+    fontFamily: "'Lora', serif",
   },
 }
 
