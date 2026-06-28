@@ -2,3 +2,5 @@ fastapi
 uvicorn
 scikit-learn
 pandas
+python-dotenv
+requests

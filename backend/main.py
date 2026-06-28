@@ -1,8 +1,16 @@
-from fastapi import FastAPI  # Import the FastAPI class from the fastapi library
-from fastapi.middleware.cors import CORSMiddleware  # Middleware that handles cross-origin requests
-from recommender import get_recommendations  # Import our TF-IDF recommendation function
+import os
+import requests
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from recommender import get_recommendations, get_fallback_recommendations
 
-app = FastAPI()  # Create a FastAPI "application" — this is the core object that handles all requests
+# Read variables from backend/.env into os.environ so os.getenv() can find them
+load_dotenv()
+
+GOOGLE_BOOKS_API_KEY = os.getenv("GOOGLE_BOOKS_API_KEY")
+
+app = FastAPI()
 
 # CORS (Cross-Origin Resource Sharing) is a browser security rule that blocks requests
 # made from one domain/port to a different one. Our React app runs on localhost:5173
@@ -22,7 +30,35 @@ def read_root():  # Define the function that will run for that route
 
 
 @app.get("/recommendations")
-def recommendations(title: str):  # "title" here is a query parameter — FastAPI reads it from the URL automatically,
-                                   # e.g. /recommendations?title=Gilead  (the ?key=value part is the query parameter)
+def recommendations(title: str):
+    # Try the fast path first: look up the title directly in our local dataset
     results = get_recommendations(title)
+
+    # get_recommendations returns [{"error": "..."}] when the title isn't found.
+    # We only call Google Books in that case — no point spending API quota
+    # on books we already have in the dataset.
+    if len(results) == 1 and "error" in results[0]:
+        # Fetch the book's description from Google Books using the title as a query
+        api_url = (
+            f"https://www.googleapis.com/books/v1/volumes"
+            f"?q={requests.utils.quote(title)}&key={GOOGLE_BOOKS_API_KEY}&maxResults=1"
+        )
+        response = requests.get(api_url)
+        data = response.json()
+
+        # Pull the description from the first result, if one exists
+        items = data.get("items", [])
+        description = (
+            items[0]["volumeInfo"].get("description") if items else None
+        )
+
+        if description:
+            # Use the description as a query against our TF-IDF matrix —
+            # this finds dataset books with similar themes even though the
+            # exact title isn't in our dataset
+            return get_fallback_recommendations(description)
+
+        # No description available, so we can't do better than the not-found error
+        return results
+
     return results

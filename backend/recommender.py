@@ -29,6 +29,31 @@ cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
 title_to_index = pd.Series(df.index, index=df["title"].str.lower())
 
 
+def get_fallback_recommendations(description: str, n: int = 5) -> list[dict]:
+    # transform() reuses the vocabulary and IDF weights learned from the original
+    # dataset — it does NOT relearn from this new text. This keeps the vector
+    # space consistent so cosine similarity scores are meaningful comparisons.
+    desc_vector = vectorizer.transform([description])
+
+    # Compare the description vector against every book in the dataset
+    sim_scores = cosine_similarity(desc_vector, tfidf_matrix)[0]
+
+    # Sort by similarity score, highest first, as (index, score) pairs
+    top_matches = sorted(enumerate(sim_scores), key=lambda x: x[1], reverse=True)[:n]
+
+    results = []
+    for book_idx, _ in top_matches:
+        row = df.iloc[book_idx]
+        results.append({
+            "title": row["title"],
+            "authors": row["authors"],
+            "categories": row["categories"],
+            "thumbnail": row["thumbnail"] if pd.notna(row["thumbnail"]) else None,
+        })
+
+    return results
+
+
 def get_recommendations(title: str, n: int = 5) -> list[dict]:
     # Normalise the input title to lowercase to match our index
     key = title.strip().lower()
