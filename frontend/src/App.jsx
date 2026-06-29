@@ -117,6 +117,11 @@ function App() {
   // State: books the user has saved to their library
   const [library, setLibrary] = useState([])
   const [showLibrary, setShowLibrary] = useState(false)
+  const [authorBooks, setAuthorBooks] = useState([])
+  const [similarBooks, setSimilarBooks] = useState([])
+  const [resultCount, setResultCount] = useState(5)
+  const [authorCount, setAuthorCount] = useState(5)
+  const [similarCount, setSimilarCount] = useState(5)
   // ── Auth listener ─────────────────────────────────────────────────────────
   // onAuthStateChanged fires whenever the user signs in or out — keeps `user` in sync
   useEffect(() => {
@@ -221,17 +226,45 @@ function App() {
     return <Library user={user} onBack={() => setShowLibrary(false)} />
   }
 
-  // Called when the user clicks "Get Recommendations"
+  // Fetches "more by this author" and "more like this genre" from Google Books
+  // in parallel, then stores results in state to display below the main results
+  async function fetchExtras(firstBook, authorN = 5, similarN = 5) {
+    const API_KEY = import.meta.env.VITE_GOOGLE_BOOKS_API_KEY
+    const [authorRes, subjectRes] = await Promise.all([
+      fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${encodeURIComponent(firstBook.authors)}"&maxResults=${authorN}&key=${API_KEY}`),
+      fetch(`https://www.googleapis.com/books/v1/volumes?q=subject:"${encodeURIComponent(firstBook.categories || '')}"&maxResults=${similarN}&key=${API_KEY}`),
+    ])
+    const [authorData, subjectData] = await Promise.all([authorRes.json(), subjectRes.json()])
+
+    const mapBook = (item) => ({
+      title: item.volumeInfo?.title || 'Unknown',
+      authors: item.volumeInfo?.authors?.join(', ') || 'Unknown',
+      categories: item.volumeInfo?.categories?.join(', ') || null,
+      thumbnail: item.volumeInfo?.imageLinks?.thumbnail || null,
+    })
+
+    setAuthorBooks((authorData.items || []).map(mapBook))
+    setSimilarBooks((subjectData.items || []).map(mapBook))
+  }
+
+  // Called when the user clicks "Get Recommendations" or "Show More"
   // async/await lets us write async code that reads like normal sequential code
-  async function fetchRecommendations() {
+  async function fetchRecommendations(count = 5) {
     if (!title.trim()) return
     setLoading(true)
     setError('')
     setRecommendations([])
+    setResultCount(count)
+    if (count === 5) {
+      setAuthorBooks([])
+      setSimilarBooks([])
+      setAuthorCount(5)
+      setSimilarCount(5)
+    }
 
     try {
       const response = await fetch(
-        `http://localhost:8000/recommendations?title=${encodeURIComponent(title)}`
+        `http://localhost:8000/recommendations?title=${encodeURIComponent(title)}&n=${count}`
       )
       const data = await response.json()
 
@@ -240,6 +273,7 @@ function App() {
         setError(`Couldn't find "${title}" in our library. Try another title.`)
       } else {
         setRecommendations(data)
+        if (count === 5 && data.length > 0) fetchExtras(data[0])
       }
     } catch {
       // This runs if the network request itself fails (e.g. backend isn't running)
@@ -281,9 +315,9 @@ function App() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             // Allow submitting with the Enter key, not just the button
-            onKeyDown={(e) => e.key === 'Enter' && fetchRecommendations()}
+            onKeyDown={(e) => e.key === 'Enter' && fetchRecommendations(5)}
           />
-          <button style={styles.button} onClick={fetchRecommendations}>
+          <button style={styles.button} onClick={() => fetchRecommendations(5)}>
             Get Recommendations
           </button>
         </div>
@@ -319,6 +353,76 @@ function App() {
                 />
               ))}
             </div>
+            {recommendations.length >= resultCount && (
+              <div style={{ textAlign: 'center', marginTop: '24px' }}>
+                <button
+                  style={styles.showMoreButton}
+                  onClick={() => fetchRecommendations(resultCount + 5)}
+                >
+                  Show More
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {authorBooks.length > 0 && (
+          <div>
+            <h2 style={styles.resultsHeading}>More from {recommendations[0]?.authors}</h2>
+            <div style={styles.grid}>
+              {authorBooks.map((book, i) => (
+                <BookCard
+                  key={i}
+                  book={book}
+                  isSaved={library.some((b) => b.title === book.title)}
+                  onSave={() => saveBook(book)}
+                />
+              ))}
+            </div>
+            {authorBooks.length >= authorCount && (
+              <div style={{ textAlign: 'center', marginTop: '24px' }}>
+                <button
+                  style={styles.showMoreButton}
+                  onClick={() => {
+                    const next = authorCount + 5
+                    setAuthorCount(next)
+                    fetchExtras(recommendations[0], next, similarCount)
+                  }}
+                >
+                  Show More
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {similarBooks.length > 0 && (
+          <div>
+            <h2 style={styles.resultsHeading}>More like this</h2>
+            <div style={styles.grid}>
+              {similarBooks.map((book, i) => (
+                <BookCard
+                  key={i}
+                  book={book}
+                  isSaved={library.some((b) => b.title === book.title)}
+                  onSave={() => saveBook(book)}
+                />
+              ))}
+            </div>
+            {similarBooks.length >= similarCount && (
+              <div style={{ textAlign: 'center', marginTop: '24px' }}>
+                <button
+                  style={styles.showMoreButton}
+                  onClick={() => {
+                    const next = similarCount + 5
+                    setSimilarCount(next)
+                    fetchExtras(recommendations[0], authorCount, next)
+                  }}
+                >
+                  Show More
+                </button>
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -477,6 +581,7 @@ const styles = {
     borderLeft: '4px solid #C9AE7C',
     paddingLeft: '12px',
     textTransform: 'lowercase',
+    marginTop: '56px',
   },
   grid: {
     display: 'grid',
@@ -547,6 +652,16 @@ const styles = {
     border: '1px solid #EADBCF',
     borderRadius: '50px',
     cursor: 'default',
+    fontFamily: "'Lora', serif",
+  },
+  showMoreButton: {
+    padding: '10px 28px',
+    fontSize: '0.9rem',
+    backgroundColor: 'transparent',
+    color: '#6F5B47',
+    border: '1px solid #C9AE7C',
+    borderRadius: '50px',
+    cursor: 'pointer',
     fontFamily: "'Lora', serif",
   },
 }

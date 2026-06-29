@@ -30,9 +30,9 @@ def read_root():  # Define the function that will run for that route
 
 
 @app.get("/recommendations")
-def recommendations(title: str):
+def recommendations(title: str, n: int = 5):
     # Try the fast path first: look up the title directly in our local dataset
-    results = get_recommendations(title)
+    results = get_recommendations(title, n)
 
     # get_recommendations returns [{"error": "..."}] when the title isn't found.
     # We only call Google Books in that case — no point spending API quota
@@ -56,7 +56,7 @@ def recommendations(title: str):
             # Use the description as a query against our TF-IDF matrix —
             # this finds dataset books with similar themes even though the
             # exact title isn't in our dataset
-            return get_fallback_recommendations(description)
+            return get_fallback_recommendations(description, n)
 
         # No description available, so we can't do better than the not-found error
         return results
