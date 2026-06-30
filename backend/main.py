@@ -3,7 +3,12 @@ import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from recommender import get_recommendations, get_fallback_recommendations
+from pydantic import BaseModel
+from recommender import get_recommendations, get_fallback_recommendations, get_recommendations_from_list, search_books
+
+
+class LibraryRequest(BaseModel):
+    titles: list[str]
 
 # Read variables from backend/.env into os.environ so os.getenv() can find them
 load_dotenv()
@@ -62,3 +67,13 @@ def recommendations(title: str, n: int = 5):
         return results
 
     return results
+
+
+@app.get("/search")
+def search(q: str, n: int = 8):
+    return search_books(q, n)
+
+
+@app.post("/recommendations-from-library")
+def recommendations_from_library(body: LibraryRequest):
+    return get_recommendations_from_list(body.titles)

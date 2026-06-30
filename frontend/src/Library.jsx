@@ -128,8 +128,10 @@ function Library({ user, onBack }) {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={styles.page}>
-      <button style={styles.backButton} onClick={onBack}>← Back</button>
-      <h1 style={styles.heading}>My Library</h1>
+      <div style={styles.header}>
+        <button style={styles.backButton} onClick={onBack}>← Back</button>
+        <h1 style={styles.heading}>My Library</h1>
+      </div>
 
       {/* ════════════════════════════════════════════════════════════════════
           SECTION 1 — Search and add books
@@ -334,37 +336,49 @@ function Library({ user, onBack }) {
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = {
   page: {
-    width: '100%',
-    maxWidth: '1000px',
-    margin: '0 auto',
-    padding: '40px 32px',
-    boxSizing: 'border-box',
+    minHeight: '100vh',
     fontFamily: "'Lora', serif",
     color: '#3D3A36',
-    textAlign: 'left',
+    background: 'transparent',
+    position: 'relative',
+    zIndex: 10,
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '24px',
+    padding: '22px 48px',
+    borderBottom: '1px solid #EADBCF',
+    maxWidth: '1000px',
+    margin: '0 auto',
+    width: '100%',
+    boxSizing: 'border-box',
   },
   backButton: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
+    padding: '8px 16px',
+    fontSize: '0.85rem',
+    backgroundColor: 'transparent',
     color: '#6F5B47',
+    border: '1px solid #EADBCF',
+    borderRadius: '50px',
+    cursor: 'pointer',
     fontFamily: "'Lora', serif",
-    fontSize: '0.95rem',
-    padding: '0',
-    marginBottom: '24px',
-    display: 'inline-block',
+    whiteSpace: 'nowrap',
   },
   heading: {
     fontFamily: "'Playfair Display', serif",
-    fontSize: '2.8rem',
+    fontSize: '2rem',
     fontWeight: '600',
     color: '#5F4C3B',
-    marginBottom: '40px',
-    textAlign:'left',
-
+    margin: 0,
+    textTransform: 'lowercase',
   },
   section: {
-    marginBottom: '52px',
+    maxWidth: '1000px',
+    margin: '48px auto 0',
+    padding: '0 48px 52px',
+    boxSizing: 'border-box',
+    textAlign: 'left',
   },
   shelfHeading: {
     fontFamily: "'Playfair Display', serif",

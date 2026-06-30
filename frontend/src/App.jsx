@@ -5,12 +5,14 @@ import { collection, setDoc, getDocs, doc } from 'firebase/firestore'
 import Auth from './Auth'
 import Profile from './Profile'
 import Library from './Library'
+import WhatsNext from './WhatsNext'
+import Popular from './Popular'
 
 // Genre mood pills the user can click to quickly fill in the search box
 const GENRES = ['Fiction', 'Mystery', 'Biography', 'Sci-Fi', 'Romance']
 
 // ── Navbar ────────────────────────────────────────────────────────────────────
-function Navbar({ user, onSignOut, onProfile, onLibrary }) {
+function Navbar({ user, onSignOut, onProfile, onLibrary, onWhatsNext, onPopular }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const avatarRef = useRef(null)
 
@@ -63,8 +65,8 @@ function Navbar({ user, onSignOut, onProfile, onLibrary }) {
       {/* ── Nav links (right side) ── */}
       <div style={styles.navLinks}>
         <span style={{ ...styles.navLink, cursor: 'pointer' }} onClick={onLibrary}> My Library </span>
-        <a href="#" style={styles.navLink}>What's Next</a>
-        <a href="#" style={styles.navLink}>Popular</a>
+        <span style={{ ...styles.navLink, cursor: 'pointer' }} onClick={onWhatsNext}>What's Next</span>
+        <span style={{ ...styles.navLink, cursor: 'pointer' }} onClick={onPopular}>Popular</span>
       </div>
     </nav>
   )
@@ -117,11 +119,15 @@ function App() {
   // State: books the user has saved to their library
   const [library, setLibrary] = useState([])
   const [showLibrary, setShowLibrary] = useState(false)
+  const [showWhatsNext, setShowWhatsNext] = useState(false)
+  const [showPopular, setShowPopular] = useState(false)
   const [authorBooks, setAuthorBooks] = useState([])
   const [similarBooks, setSimilarBooks] = useState([])
   const [resultCount, setResultCount] = useState(5)
   const [authorCount, setAuthorCount] = useState(5)
   const [similarCount, setSimilarCount] = useState(5)
+  const [suggestions, setSuggestions] = useState([])
+  const [showDropdown, setShowDropdown] = useState(false)
   // ── Auth listener ─────────────────────────────────────────────────────────
   // onAuthStateChanged fires whenever the user signs in or out — keeps `user` in sync
   useEffect(() => {
@@ -168,6 +174,26 @@ function App() {
     // Cleanup: stop creating petals if the component ever unmounts
     return () => clearInterval(interval)
   }, [])
+
+  // Debounced autocomplete: fires 300ms after the user stops typing, only if >= 3 chars
+  useEffect(() => {
+    if (title.length < 3) {
+      setSuggestions([])
+      setShowDropdown(false)
+      return
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`http://localhost:8000/search?q=${encodeURIComponent(title)}`)
+        const data = await res.json()
+        setSuggestions(data)
+        setShowDropdown(true)
+      } catch {
+        setSuggestions([])
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [title])
 
   useEffect(() => {
     if (!user?.uid) return
@@ -224,6 +250,14 @@ function App() {
 
   if (showLibrary) {
     return <Library user={user} onBack={() => setShowLibrary(false)} />
+  }
+
+  if (showWhatsNext) {
+    return <WhatsNext user={user} onBack={() => setShowWhatsNext(false)} />
+  }
+
+  if (showPopular) {
+    return <Popular user={user} onBack={() => setShowPopular(false)} />
   }
 
   // Fetches "more by this author" and "more like this genre" from Google Books
@@ -296,6 +330,8 @@ function App() {
         onSignOut={() => signOut(auth)}
         onProfile={() => setShowProfile(true)}
         onLibrary={() => setShowLibrary(true)}
+        onWhatsNext={() => setShowWhatsNext(true)}
+        onPopular={() => setShowPopular(true)}
       />
 
       <main style={styles.main}>
@@ -308,15 +344,44 @@ function App() {
 
         {/* ── Search bar ── */}
         <div style={styles.searchRow}>
-          <input
-            style={styles.input}
-            type="text"
-            placeholder="e.g. Gilead, The Alchemist..."
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            // Allow submitting with the Enter key, not just the button
-            onKeyDown={(e) => e.key === 'Enter' && fetchRecommendations(5)}
-          />
+          <div style={{ position: 'relative', flex: 1 }}>
+            <input
+              style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }}
+              type="text"
+              placeholder="e.g. Gilead, The Alchemist..."
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && fetchRecommendations(5)}
+              onFocus={() => title.length >= 3 && setShowDropdown(true)}
+              onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+            />
+            {showDropdown && (
+              <div style={styles.suggestionsDropdown}>
+                {suggestions.map((s, i) => (
+                  <div
+                    key={i}
+                    style={styles.suggestionItem}
+                    onMouseDown={() => {
+                      setTitle(s.title)
+                      setShowDropdown(false)
+                    }}
+                  >
+                    <span>{s.title}</span>
+                    <span style={{ color: '#8B775E', fontSize: '0.8rem' }}>{s.authors}</span>
+                  </div>
+                ))}
+                <div
+                  style={styles.suggestionFallback}
+                  onMouseDown={() => {
+                    setShowDropdown(false)
+                    fetchRecommendations(5)
+                  }}
+                >
+                  Can't find it? Search Google Books →
+                </div>
+              </div>
+            )}
+          </div>
           <button style={styles.button} onClick={() => fetchRecommendations(5)}>
             Get Recommendations
           </button>
@@ -663,6 +728,36 @@ const styles = {
     borderRadius: '50px',
     cursor: 'pointer',
     fontFamily: "'Lora', serif",
+  },
+  suggestionsDropdown: {
+    position: 'absolute',
+    top: 'calc(100% + 6px)',
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFDF9',
+    border: '1px solid #EADBCF',
+    borderRadius: '16px',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+    zIndex: 100,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    padding: '10px 16px',
+    cursor: 'pointer',
+    borderBottom: '1px solid #F5EBD9',
+    fontFamily: "'Lora', serif",
+    fontSize: '0.9rem',
+    color: '#3D3A36',
+  },
+  suggestionFallback: {
+    padding: '10px 16px',
+    cursor: 'pointer',
+    color: '#C9AE7C',
+    fontSize: '0.85rem',
+    fontFamily: "'Lora', serif",
+    fontStyle: 'italic',
   },
 }
 

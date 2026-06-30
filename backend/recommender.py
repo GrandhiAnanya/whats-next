@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from pathlib import Path
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -52,6 +53,51 @@ def get_fallback_recommendations(description: str, n: int = 5) -> list[dict]:
         })
 
     return results
+
+
+def get_recommendations_from_list(titles: list, n: int = 10) -> list[dict]:
+    # Find which input titles exist in the dataset
+    found_indices = []
+    for title in titles:
+        key = title.strip().lower()
+        if key not in title_to_index:
+            continue
+        idx = title_to_index[key]
+        # Handle rare duplicate titles — take the first match
+        found_indices.append(int(idx if not isinstance(idx, pd.Series) else idx.iloc[0]))
+
+    if not found_indices:
+        return []
+
+    # Average the TF-IDF vectors of all found books into one "taste profile".
+    # np.asarray avoids numpy.matrix deprecation warnings from the sparse .mean() result.
+    profile = np.asarray(tfidf_matrix[found_indices].mean(axis=0))  # shape (1, n_features)
+    sim_scores = cosine_similarity(profile, tfidf_matrix)[0]
+
+    input_lower = {t.strip().lower() for t in titles}
+
+    results = []
+    for book_idx, _ in sorted(enumerate(sim_scores), key=lambda x: x[1], reverse=True):
+        row = df.iloc[book_idx]
+        if row["title"].strip().lower() in input_lower:
+            continue
+        results.append({
+            "title": row["title"],
+            "authors": row["authors"],
+            "categories": row["categories"],
+            "thumbnail": row["thumbnail"] if pd.notna(row["thumbnail"]) else None,
+        })
+        if len(results) == n:
+            break
+
+    return results
+
+
+def search_books(query: str, n: int = 8) -> list[dict]:
+    q = query.strip().lower()
+    mask = df["title"].str.lower().str.contains(q, na=False)
+    matches = df[mask].head(n)
+    return [{"title": row["title"], "authors": row["authors"]} for _, row in matches.iterrows()]
 
 
 def get_recommendations(title: str, n: int = 5) -> list[dict]:
