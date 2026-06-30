@@ -128,6 +128,11 @@ function App() {
   const [similarCount, setSimilarCount] = useState(5)
   const [suggestions, setSuggestions] = useState([])
   const [showDropdown, setShowDropdown] = useState(false)
+  const [googleSuggestions, setGoogleSuggestions] = useState([])
+  const [selectedAuthor, setSelectedAuthor] = useState('')
+  const [displayValue, setDisplayValue] = useState('')
+  const [isFetchingGoogle, setIsFetchingGoogle] = useState(false)
+  const [justSelected, setJustSelected] = useState(false)
   // ── Auth listener ─────────────────────────────────────────────────────────
   // onAuthStateChanged fires whenever the user signs in or out — keeps `user` in sync
   useEffect(() => {
@@ -177,6 +182,10 @@ function App() {
 
   // Debounced autocomplete: fires 300ms after the user stops typing, only if >= 3 chars
   useEffect(() => {
+    if (justSelected) {
+      setJustSelected(false)
+      return
+    }
     if (title.length < 3) {
       setSuggestions([])
       setShowDropdown(false)
@@ -264,8 +273,9 @@ function App() {
   // in parallel, then stores results in state to display below the main results
   async function fetchExtras(firstBook, authorN = 5, similarN = 5) {
     const API_KEY = import.meta.env.VITE_GOOGLE_BOOKS_API_KEY
+    const authorQuery = selectedAuthor || firstBook.authors
     const [authorRes, subjectRes] = await Promise.all([
-      fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${encodeURIComponent(firstBook.authors)}"&maxResults=${authorN}&key=${API_KEY}`),
+      fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${encodeURIComponent(authorQuery)}"&maxResults=${authorN}&key=${API_KEY}`),
       fetch(`https://www.googleapis.com/books/v1/volumes?q=subject:"${encodeURIComponent(firstBook.categories || '')}"&maxResults=${similarN}&key=${API_KEY}`),
     ])
     const [authorData, subjectData] = await Promise.all([authorRes.json(), subjectRes.json()])
@@ -349,11 +359,14 @@ function App() {
               style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }}
               type="text"
               placeholder="e.g. Gilead, The Alchemist..."
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              value={displayValue}
+              onChange={(e) => { setTitle(e.target.value); setDisplayValue(e.target.value); setSelectedAuthor('') }}
               onKeyDown={(e) => e.key === 'Enter' && fetchRecommendations(5)}
               onFocus={() => title.length >= 3 && setShowDropdown(true)}
-              onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+              onBlur={() => {
+                if (isFetchingGoogle) return
+                setTimeout(() => setShowDropdown(false), 200)
+              }}
             />
             {showDropdown && (
               <div style={styles.suggestionsDropdown}>
@@ -363,6 +376,9 @@ function App() {
                     style={styles.suggestionItem}
                     onMouseDown={() => {
                       setTitle(s.title)
+                      setJustSelected(true)
+                      setSelectedAuthor(s.authors)
+                      setDisplayValue(`${s.title} by ${s.authors}`)
                       setShowDropdown(false)
                     }}
                   >
@@ -372,13 +388,48 @@ function App() {
                 ))}
                 <div
                   style={styles.suggestionFallback}
-                  onMouseDown={() => {
-                    setShowDropdown(false)
-                    fetchRecommendations(5)
+                  onMouseDown={async () => {
+                    const API_KEY = import.meta.env.VITE_GOOGLE_BOOKS_API_KEY
+                    setIsFetchingGoogle(true)
+                    try {
+                      const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(title)}&maxResults=5&key=${API_KEY}`)
+                      const data = await res.json()
+                      const mapped = (data.items || []).map((item) => ({
+                        title: item.volumeInfo?.title || 'Unknown',
+                        authors: item.volumeInfo?.authors?.join(', ') || '',
+                      }))
+                      setGoogleSuggestions(mapped)
+                    } catch {
+                      setGoogleSuggestions([])
+                    } finally {
+                      setIsFetchingGoogle(false)
+                    }
                   }}
                 >
                   Can't find it? Search Google Books →
                 </div>
+                {isFetchingGoogle && (
+                  <div style={{ padding: '10px 16px', color: '#8B775E', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                    Searching Google Books...
+                  </div>
+                )}
+                {googleSuggestions.map((s, i) => (
+                  <div
+                    key={`g-${i}`}
+                    style={styles.suggestionItem}
+                    onMouseDown={() => {
+                      setTitle(s.title)
+                      setJustSelected(true)
+                      setSelectedAuthor(s.authors)
+                      setDisplayValue(`${s.title} by ${s.authors}`)
+                      setShowDropdown(false)
+                      setGoogleSuggestions([])
+                    }}
+                  >
+                    <span>{s.title}</span>
+                    <span style={{ color: '#8B775E', fontSize: '0.8rem' }}>{s.authors}</span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -433,7 +484,7 @@ function App() {
 
         {authorBooks.length > 0 && (
           <div>
-            <h2 style={styles.resultsHeading}>More from {recommendations[0]?.authors}</h2>
+            <h2 style={styles.resultsHeading}>More from {selectedAuthor || recommendations[0]?.authors}</h2>
             <div style={styles.grid}>
               {authorBooks.map((book, i) => (
                 <BookCard
@@ -451,7 +502,7 @@ function App() {
                   onClick={() => {
                     const next = authorCount + 5
                     setAuthorCount(next)
-                    fetchExtras(recommendations[0], next, similarCount)
+                    fetchExtras({ authors: selectedAuthor || recommendations[0]?.authors, categories: recommendations[0]?.categories }, next, similarCount)
                   }}
                 >
                   Show More
