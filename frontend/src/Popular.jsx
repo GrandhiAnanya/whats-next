@@ -25,8 +25,30 @@ function PopularCard({ book }) {
   )
 }
 
+function RatedCard({ book }) {
+  return (
+    <div style={styles.card}>
+      {book.thumbnail ? (
+        <img src={book.thumbnail} alt={book.title} style={styles.thumbnail} />
+      ) : (
+        <div style={styles.thumbnailPlaceholder}>No Cover</div>
+      )}
+      <div style={styles.cardBody}>
+        <p style={styles.cardTitle}>{book.title}</p>
+        <p style={styles.cardMeta}>{book.authors}</p>
+        <p style={styles.cardMeta}>{book.categories}</p>
+        <div style={styles.cardFooter}>
+          <span style={styles.ratedBadge}>Rated by {book.ratingCount} reader{book.ratingCount !== 1 ? 's' : ''}</span>
+          <span style={styles.rating}>★ {book.avgRating}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Popular({ onBack }) {
   const [popular, setPopular] = useState([])
+  const [highlyRated, setHighlyRated] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -37,6 +59,7 @@ export default function Popular({ onBack }) {
         const snapshot = await getDocs(collectionGroup(db, 'library'))
 
         const bookMap = {}
+        const ratingMap = {}
         snapshot.forEach((docSnap) => {
           const data = docSnap.data()
           if (!data.title) return
@@ -54,6 +77,18 @@ export default function Popular({ onBack }) {
           if (data.rating != null) {
             bookMap[data.title].ratings.push(data.rating)
           }
+          if (data.rating != null && data.rating >= 3 && data.status === 'read') {
+            if (!ratingMap[data.title]) {
+              ratingMap[data.title] = {
+                title: data.title,
+                authors: data.authors || '',
+                categories: data.categories || null,
+                thumbnail: data.thumbnail || null,
+                ratings: [],
+              }
+            }
+            ratingMap[data.title].ratings.push(data.rating)
+          }
         })
 
         const sorted = Object.values(bookMap)
@@ -68,6 +103,20 @@ export default function Popular({ onBack }) {
           }))
 
         setPopular(sorted)
+
+        const sortedRated = Object.values(ratingMap)
+          .map((b) => ({
+            ...b,
+            avgRating: (b.ratings.reduce((sum, r) => sum + r, 0) / b.ratings.length).toFixed(1),
+            ratingCount: b.ratings.length,
+          }))
+          .sort((a, b) => {
+            const diff = parseFloat(b.avgRating) - parseFloat(a.avgRating)
+            if (diff !== 0) return diff
+            return b.ratingCount - a.ratingCount
+          })
+          .slice(0, 12)
+        setHighlyRated(sortedRated)
       } catch (e) {
         setError('Could not load popular books.')
       } finally {
@@ -101,6 +150,23 @@ export default function Popular({ onBack }) {
                 <PopularCard key={i} book={book} />
               ))}
             </div>
+          </div>
+        )}
+
+        {!loading && (
+          <div style={{ marginTop: '56px' }}>
+            <h2 style={styles.resultsHeading}>highly rated by readers</h2>
+            {highlyRated.length === 0 ? (
+              <p style={styles.feedback}>
+                No ratings yet — be the first to rate a book in your library!
+              </p>
+            ) : (
+              <div style={styles.grid}>
+                {highlyRated.map((book, i) => (
+                  <RatedCard key={i} book={book} />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -222,6 +288,15 @@ const styles = {
     color: '#6F5B47',
     backgroundColor: '#F5EBD9',
     border: '1px solid #EADBCF',
+    borderRadius: '20px',
+    padding: '3px 10px',
+    fontFamily: "'Lora', serif",
+  },
+  ratedBadge: {
+    fontSize: '0.75rem',
+    color: '#4A6B5F',
+    backgroundColor: '#EDF5F2',
+    border: '1px solid #C2D9D3',
     borderRadius: '20px',
     padding: '3px 10px',
     fontFamily: "'Lora', serif",

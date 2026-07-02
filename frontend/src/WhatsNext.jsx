@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { db } from './firebase'
 import { collection, getDocs, setDoc, doc } from 'firebase/firestore'
 
@@ -27,11 +27,12 @@ function BookCard({ book, onSave, isSaved }) {
 }
 
 export default function WhatsNext({ user, onBack }) {
-  const [readBooks, setReadBooks] = useState([])
-  const [recommendations, setRecommendations] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  // Each entry: { readBook, results, loading }
+  const [sections, setSections] = useState([])
   const [library, setLibrary] = useState([])
+  const [initialLoading, setInitialLoading] = useState(true)
+  const [hasReadBooks, setHasReadBooks] = useState(true)
+  const carouselRefs = useRef([])
 
   useEffect(() => {
     async function load() {
@@ -39,28 +40,66 @@ export default function WhatsNext({ user, onBack }) {
       const allBooks = snapshot.docs.map((d) => d.data())
       setLibrary(allBooks)
 
-      const read = allBooks.filter((b) => b.status === 'read')
-      setReadBooks(read)
+      const readBooks = allBooks.filter((b) => b.status === 'read')
 
-      if (read.length === 0) {
-        setLoading(false)
+      if (readBooks.length === 0) {
+        setHasReadBooks(false)
+        setInitialLoading(false)
         return
       }
 
-      try {
-        const res = await fetch('http://localhost:8000/recommendations-from-library', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ titles: read.map((b) => b.title) }),
+      // Set up a loading placeholder for each section immediately
+      setSections(readBooks.map((b) => ({ readBook: b, results: [], loading: true })))
+      setInitialLoading(false)
+
+      const API_KEY = import.meta.env.VITE_GOOGLE_BOOKS_API_KEY
+
+      // Fetch all sections in parallel
+      await Promise.all(
+        readBooks.map(async (book, index) => {
+          try {
+            const [tfidfRes, googleRes] = await Promise.all([
+              fetch(`http://localhost:8000/recommendations?title=${encodeURIComponent(book.title)}&n=4`),
+              fetch(`https://www.googleapis.com/books/v1/volumes?q=subject:"${encodeURIComponent(book.categories || book.title)}"&maxResults=4&key=${API_KEY}`),
+            ])
+
+            const tfidfData = await tfidfRes.json()
+            const googleData = await googleRes.json()
+
+            const tfidfResults = (tfidfData[0]?.error ? [] : tfidfData).map((item) => ({
+              title: item.title,
+              authors: item.authors,
+              categories: item.categories || null,
+              thumbnail: item.thumbnail || null,
+            }))
+
+            const googleResults = (googleData.items || []).map((item) => ({
+              title: item.volumeInfo?.title || 'Unknown',
+              authors: item.volumeInfo?.authors?.join(', ') || '',
+              categories: item.volumeInfo?.categories?.join(', ') || null,
+              thumbnail: item.volumeInfo?.imageLinks?.thumbnail || null,
+            }))
+
+            // Remove Google results whose title already appears in TF-IDF results
+            const tfidfTitles = new Set(tfidfResults.map((b) => b.title.toLowerCase()))
+            const uniqueGoogle = googleResults.filter(
+              (b) => !tfidfTitles.has(b.title.toLowerCase())
+            )
+
+            const combined = [...tfidfResults, ...uniqueGoogle]
+
+            setSections((prev) =>
+              prev.map((s, i) => (i === index ? { ...s, results: combined, loading: false } : s))
+            )
+          } catch {
+            setSections((prev) =>
+              prev.map((s, i) => (i === index ? { ...s, results: [], loading: false } : s))
+            )
+          }
         })
-        const data = await res.json()
-        setRecommendations(data)
-      } catch {
-        setError('Could not reach the server. Make sure the backend is running.')
-      } finally {
-        setLoading(false)
-      }
+      )
     }
+
     load()
   }, [user.uid])
 
@@ -79,13 +118,6 @@ export default function WhatsNext({ user, onBack }) {
     setLibrary((prev) => [...prev, bookData])
   }
 
-  function buildSubheading() {
-    const shown = readBooks.slice(0, 3).map((b) => b.title)
-    const extra = readBooks.length - 3
-    const base = shown.join(', ')
-    return extra > 0 ? `${base}, and ${extra} more` : base
-  }
-
   return (
     <div style={styles.page}>
       <div style={styles.header}>
@@ -94,47 +126,59 @@ export default function WhatsNext({ user, onBack }) {
       </div>
 
       <main style={styles.main}>
-        {loading && (
-          <p style={styles.feedback}>
-            Finding your next read based on {readBooks.length} book{readBooks.length !== 1 ? 's' : ''}...
-          </p>
+        {initialLoading && (
+          <p style={styles.feedback}>Loading your reading history...</p>
         )}
 
-        {!loading && readBooks.length === 0 && (
+        {!initialLoading && !hasReadBooks && (
           <div style={styles.emptyState}>
             <p style={styles.emptyText}>
-              Add some books to your Read shelf first, and we'll recommend what to read next!
+              Add some books to your Read shelf in My Library first!
             </p>
-            <p style={styles.emptyHint}>Visit My Library to mark books as "Read".</p>
             <button style={styles.primaryButton} onClick={onBack}>← Go back</button>
           </div>
         )}
 
-        {error && <p style={{ ...styles.feedback, color: '#b0413e' }}>{error}</p>}
-
-        {!loading && !error && recommendations.length === 0 && readBooks.length > 0 && (
-          <p style={styles.feedback}>
-            We couldn't match your read books to our dataset yet. Try adding more titles!
-          </p>
-        )}
-
-        {!loading && recommendations.length > 0 && (
-          <div>
+        {sections.map((section, i) => (
+          <div key={i} style={styles.section}>
             <h2 style={styles.resultsHeading}>
-              because you've read {buildSubheading()}
+              because you read {section.readBook.title}
             </h2>
-            <div style={styles.grid}>
-              {recommendations.map((book, i) => (
-                <BookCard
-                  key={i}
-                  book={book}
-                  isSaved={library.some((b) => b.title === book.title)}
-                  onSave={() => saveBook(book)}
-                />
-              ))}
-            </div>
+            {section.loading ? (
+              <p style={styles.feedback}>Finding recommendations...</p>
+            ) : section.results.length === 0 ? (
+              <p style={styles.feedback}>No recommendations found for this title.</p>
+            ) : (
+              <div style={styles.carouselWrapper}>
+                {section.results.length > 4 && (
+                  <button
+                    style={styles.arrowButton}
+                    onClick={() => carouselRefs.current[i]?.scrollBy({ left: -220, behavior: 'smooth' })}
+                  >←</button>
+                )}
+                <div
+                  style={styles.carousel}
+                  ref={(el) => (carouselRefs.current[i] = el)}
+                >
+                  {section.results.map((book, j) => (
+                    <BookCard
+                      key={j}
+                      book={book}
+                      isSaved={library.some((b) => b.title === book.title)}
+                      onSave={() => saveBook(book)}
+                    />
+                  ))}
+                </div>
+                {section.results.length > 4 && (
+                  <button
+                    style={styles.arrowButton}
+                    onClick={() => carouselRefs.current[i]?.scrollBy({ left: 220, behavior: 'smooth' })}
+                  >→</button>
+                )}
+              </div>
+            )}
           </div>
-        )}
+        ))}
       </main>
     </div>
   )
@@ -184,6 +228,9 @@ const styles = {
     margin: '0 auto',
     padding: '48px',
   },
+  section: {
+    marginBottom: '56px',
+  },
   feedback: {
     textAlign: 'center',
     color: '#8B775E',
@@ -198,12 +245,6 @@ const styles = {
   emptyText: {
     color: '#5F4C3B',
     fontSize: '1.1rem',
-    marginBottom: '12px',
-  },
-  emptyHint: {
-    color: '#8B775E',
-    fontSize: '0.95rem',
-    fontStyle: 'italic',
     marginBottom: '32px',
   },
   primaryButton: {
@@ -225,10 +266,33 @@ const styles = {
     paddingLeft: '12px',
     textTransform: 'lowercase',
   },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+  carouselWrapper: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  carousel: {
+    display: 'flex',
+    flexDirection: 'row',
+    overflow: 'hidden',
     gap: '20px',
+    flex: 1,
+  },
+  arrowButton: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '50%',
+    backgroundColor: '#FFFDF9',
+    border: '1px solid #EADBCF',
+    color: '#6F5B47',
+    cursor: 'pointer',
+    fontSize: '1rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    fontFamily: "'Lora', serif",
   },
   card: {
     backgroundColor: '#FFFDF9',
@@ -236,10 +300,12 @@ const styles = {
     borderRadius: '16px',
     overflow: 'hidden',
     textAlign: 'left',
+    width: '140px',
+    flexShrink: 0,
   },
   thumbnail: {
     width: '100%',
-    height: '200px',
+    height: '180px',
     objectFit: 'cover',
   },
   thumbnailPlaceholder: {
@@ -253,16 +319,16 @@ const styles = {
     fontSize: '0.85rem',
   },
   cardBody: {
-    padding: '12px',
+    padding: '8px',
   },
   cardTitle: {
     fontWeight: '500',
-    fontSize: '0.95rem',
+    fontSize: '0.78rem',
     marginBottom: '4px',
     color: '#3D3A36',
   },
   cardMeta: {
-    fontSize: '0.8rem',
+    fontSize: '0.72rem',
     color: '#8B775E',
     margin: '2px 0',
   },
