@@ -133,6 +133,7 @@ function App() {
   const [displayValue, setDisplayValue] = useState('')
   const [isFetchingGoogle, setIsFetchingGoogle] = useState(false)
   const [justSelected, setJustSelected] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState('')
   // ── Auth listener ─────────────────────────────────────────────────────────
   // onAuthStateChanged fires whenever the user signs in or out — keeps `user` in sync
   useEffect(() => {
@@ -152,7 +153,7 @@ function App() {
   // removed after 20s to avoid the DOM filling up with invisible elements
   useEffect(() => {
     const container = document.getElementById('petal-container')
-    if (!container) return 
+    if (!container) return
     const interval = setInterval(() => {
       const petal = document.createElement('div')
       const size = 6 + Math.random() * 12          // random size 6–18px
@@ -245,7 +246,7 @@ function App() {
       authors: book.authors,
       categories: book.categories,
       thumbnail: book.thumbnail || null,
-      status: 'want_to_read',   
+      status: 'want_to_read',
       rating: null,
       addedAt: new Date(),
     }
@@ -272,23 +273,54 @@ function App() {
   // Fetches "more by this author" and "more like this genre" from Google Books
   // in parallel, then stores results in state to display below the main results
   async function fetchExtras(firstBook, authorN = 5, similarN = 5) {
+
     const API_KEY = import.meta.env.VITE_GOOGLE_BOOKS_API_KEY
     const authorQuery = selectedAuthor || firstBook.authors
+    const mapToGenre = (category) => {
+      if (!category) return 'contemporary fiction'
+      const cat = category.toLowerCase()
+      if (cat.includes('romance') || cat.includes('man-woman') || cat.includes('love')) return 'romance novels'
+      if (cat.includes('thriller') || cat.includes('mystery') || cat.includes('crime')) return 'thriller mystery'
+      if (cat.includes('fantasy') || cat.includes('magic')) return 'fantasy fiction'
+      if (cat.includes('science fiction') || cat.includes('sci-fi')) return 'science fiction'
+      if (cat.includes('biography') || cat.includes('autobiography')) return 'biography'
+      if (cat.includes('self-help') || cat.includes('personal development')) return 'self help'
+      if (cat.includes('history')) return 'history books'
+      if (cat.includes('young adult')) return 'young adult fiction'
+      return category
+    }
+    const rawCategory = selectedCategory || firstBook.categories || ''
+    const mappedGenre = mapToGenre(rawCategory)
+    const similarQuery = `subject:"${mappedGenre}"`
     const [authorRes, subjectRes] = await Promise.all([
-      fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${encodeURIComponent(authorQuery)}"&maxResults=${authorN}&key=${API_KEY}`),
-      fetch(`https://www.googleapis.com/books/v1/volumes?q=subject:"${encodeURIComponent(firstBook.categories || '')}"&maxResults=${similarN}&key=${API_KEY}`),
+      fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${encodeURIComponent(authorQuery)}"&maxResults=${authorN}&orderBy=newest&key=${API_KEY}`),
+      fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(similarQuery)}&maxResults=${similarN}&orderBy=relevance&printType=books&key=${API_KEY}`),
     ])
     const [authorData, subjectData] = await Promise.all([authorRes.json(), subjectRes.json()])
 
-    const mapBook = (item) => ({
-      title: item.volumeInfo?.title || 'Unknown',
-      authors: item.volumeInfo?.authors?.join(', ') || 'Unknown',
-      categories: item.volumeInfo?.categories?.join(', ') || null,
-      thumbnail: item.volumeInfo?.imageLinks?.thumbnail || null,
-    })
+    const searchedTitle = title.toLowerCase().trim()
 
-    setAuthorBooks((authorData.items || []).map(mapBook))
-    setSimilarBooks((subjectData.items || []).map(mapBook))
+    const authorMapped = (authorData.items || [])
+      .map(item => ({
+        title: item.volumeInfo?.title || '',
+        authors: item.volumeInfo?.authors?.join(', ') || '',
+        categories: item.volumeInfo?.categories?.join(', ') || '',
+        thumbnail: item.volumeInfo?.imageLinks?.thumbnail || null,
+      }))
+      .filter(book => book.title.toLowerCase().trim() !== searchedTitle)
+
+    const similarMapped = (subjectData.items || [])
+      .map(item => ({
+        title: item.volumeInfo?.title || '',
+        authors: item.volumeInfo?.authors?.join(', ') || '',
+        categories: item.volumeInfo?.categories?.join(', ') || '',
+        thumbnail: item.volumeInfo?.imageLinks?.thumbnail || null,
+      }))
+      .filter(book => book.title.toLowerCase().trim() !== searchedTitle)
+      
+
+    setAuthorBooks(authorMapped)
+    setSimilarBooks(similarMapped)
   }
 
   // Called when the user clicks "Get Recommendations" or "Show More"
@@ -360,7 +392,7 @@ function App() {
               type="text"
               placeholder="e.g. Gilead, The Alchemist..."
               value={displayValue}
-              onChange={(e) => { setTitle(e.target.value); setDisplayValue(e.target.value); setSelectedAuthor('') }}
+              onChange={(e) => { setTitle(e.target.value); setDisplayValue(e.target.value); setSelectedAuthor(''); setSelectedCategory('') }}
               onKeyDown={(e) => e.key === 'Enter' && fetchRecommendations(5)}
               onFocus={() => title.length >= 3 && setShowDropdown(true)}
               onBlur={() => {
@@ -378,6 +410,7 @@ function App() {
                       setTitle(s.title)
                       setJustSelected(true)
                       setSelectedAuthor(s.authors)
+                      setSelectedCategory(s.categories || '')
                       setDisplayValue(`${s.title} by ${s.authors}`)
                       setShowDropdown(false)
                     }}
@@ -397,6 +430,7 @@ function App() {
                       const mapped = (data.items || []).map((item) => ({
                         title: item.volumeInfo?.title || 'Unknown',
                         authors: item.volumeInfo?.authors?.join(', ') || '',
+                        categories: item.volumeInfo?.categories?.join(', ') || '',
                       }))
                       setGoogleSuggestions(mapped)
                     } catch {
@@ -421,9 +455,19 @@ function App() {
                       setTitle(s.title)
                       setJustSelected(true)
                       setSelectedAuthor(s.authors)
+                      setSelectedCategory(s.categories || '')
                       setDisplayValue(`${s.title} by ${s.authors}`)
                       setShowDropdown(false)
                       setGoogleSuggestions([])
+                      if (!s.categories) {
+                        fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:"${encodeURIComponent(s.title)}"+inauthor:"${encodeURIComponent(s.authors)}"&maxResults=1&key=${import.meta.env.VITE_GOOGLE_BOOKS_API_KEY}`)
+                          .then(r => r.json())
+                          .then(data => {
+                            const cat = data.items?.[0]?.volumeInfo?.categories?.join(', ') || ''
+                            if (cat) setSelectedCategory(cat)
+                          })
+                          .catch(() => {})
+                      }
                     }}
                   >
                     <span>{s.title}</span>
@@ -495,7 +539,7 @@ function App() {
                 />
               ))}
             </div>
-            {authorBooks.length >= authorCount && (
+            {authorBooks.length > 0 && (
               <div style={{ textAlign: 'center', marginTop: '24px' }}>
                 <button
                   style={styles.showMoreButton}
@@ -525,7 +569,7 @@ function App() {
                 />
               ))}
             </div>
-            {similarBooks.length >= similarCount && (
+            {similarBooks.length > 0 && (
               <div style={{ textAlign: 'center', marginTop: '24px' }}>
                 <button
                   style={styles.showMoreButton}
