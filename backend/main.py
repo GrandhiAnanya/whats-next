@@ -26,6 +26,7 @@ app.add_middleware(
     allow_origins=[
     "http://localhost:5173",
     "https://whats-next-backend-h1wf.onrender.com",
+    "https://whats-next-three-delta.vercel.app",
     ],  # Only allow requests from the React dev server
     allow_methods=["*"],   # Allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],   # Allow all headers
