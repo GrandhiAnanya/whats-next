@@ -23,7 +23,11 @@ app = FastAPI()
 # so without this the browser would refuse to let the frontend talk to the backend.
 app.add_middleware(
     CORSMiddleware,
-   allow_origins=["*"],  # Only allow requests from the React dev server
+    allow_origins=[
+    "http://localhost:5173",
+    "https://whats-next-backend-h1wf.onrender.com",
+    "https://whats-next-three-delta.vercel.app",
+    ],  # Only allow requests from the React dev server
     allow_methods=["*"],   # Allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],   # Allow all headers
 )
