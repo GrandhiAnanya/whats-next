@@ -194,7 +194,7 @@ function App() {
     }
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`http://localhost:8000/search?q=${encodeURIComponent(title)}`)
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/search?q=${encodeURIComponent(title)}`)
         const data = await res.json()
         setSuggestions(data)
         setShowDropdown(true)
@@ -340,7 +340,7 @@ function App() {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/recommendations?title=${encodeURIComponent(title)}&n=${count}`
+        `${import.meta.env.VITE_API_URL}/recommendations?title=${encodeURIComponent(title)}&n=${count}`
       )
       const data = await response.json()
 

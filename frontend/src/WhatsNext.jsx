@@ -59,7 +59,7 @@ export default function WhatsNext({ user, onBack }) {
         readBooks.map(async (book, index) => {
           try {
             const [tfidfRes, googleRes] = await Promise.all([
-              fetch(`http://localhost:8000/recommendations?title=${encodeURIComponent(book.title)}&n=4`),
+              fetch(`${import.meta.env.VITE_API_URL}/recommendations?title=${encodeURIComponent(book.title)}&n=4`),
               fetch(`https://www.googleapis.com/books/v1/volumes?q=subject:"${encodeURIComponent(book.categories || book.title)}"&maxResults=4&key=${API_KEY}`),
             ])
 
