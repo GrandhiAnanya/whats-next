@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from recommender import get_recommendations, get_fallback_recommendations, get_recommendations_from_list, search_books
+from recommender import get_recommendations, get_fallback_recommendations, get_recommendations_from_list, search_books, get_genre_recommendations
 
 
 class LibraryRequest(BaseModel):
@@ -81,3 +81,7 @@ def search(q: str, n: int = 8):
 @app.post("/recommendations-from-library")
 def recommendations_from_library(body: LibraryRequest):
     return get_recommendations_from_list(body.titles)
+
+@app.get("/recommendations/genre")
+def genre_recommendations(genre: str, n: int = 8):
+    return get_genre_recommendations(genre, n)

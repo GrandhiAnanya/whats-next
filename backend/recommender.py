@@ -46,11 +46,65 @@ def get_fallback_recommendations(description: str, n: int = 5) -> list[dict]:
     for book_idx, _ in top_matches:
         row = df.iloc[book_idx]
         results.append({
-            "title": row["title"],
-            "authors": row["authors"],
-            "categories": row["categories"],
+            "title": row["title"]  if pd.notna(row["title"]) else "" ,
+            "authors": row["authors"] if pd.notna(row["authors"]) else "",
+            "categories": row["categories"] if pd.notna(row["categories"]) else "",
             "thumbnail": row["thumbnail"] if pd.notna(row["thumbnail"]) else None,
         })
+
+    return results
+
+# For each genre pill: (keywords to match against the categories column,
+# a richer phrase used for the TF-IDF fallback if there aren't enough
+# category matches)
+GENRE_KEYWORDS = {
+    "Fiction": (["fiction"], "fiction novel story"),
+    "Mystery": (["mystery", "detective", "crime"], "mystery detective crime investigation"),
+    "Biography": (["biography", "autobiography"], "biography memoir life story"),
+    "Sci-Fi": (
+        ["science fiction", "life on other planets", "interplanetary", "human-alien", "dystopia"],
+        "science fiction space future technology",
+    ),
+    "Romance": (["romance", "love stories", "man-woman relationships", "courtship"], "romance love story relationship"),
+    "Thriller": (["thriller", "suspense", "espionage"], "thriller suspense crime mystery"),
+    "Adventure": (["adventure"], "adventure quest journey exploration"),
+}
+
+
+def get_genre_recommendations(genre: str, n: int = 8) -> list[dict]:
+    keywords, fallback_phrase = GENRE_KEYWORDS.get(genre, ([genre.lower()], genre.lower()))
+    pattern = "|".join(keywords)
+
+    mask = df["categories"].fillna("").str.lower().str.contains(pattern, regex=True, na=False)
+    matched = df[mask].sort_values("average_rating", ascending=False, na_position="last")
+
+    results = []
+    seen_titles = set()
+    for _, row in matched.iterrows():
+        if len(results) >= n:
+            break
+        title = row["title"] if pd.notna(row["title"]) else ""
+        if not title or title in seen_titles:
+            continue
+        seen_titles.add(title)
+        results.append({
+            "title": title,
+            "authors": row["authors"] if pd.notna(row["authors"]) else "",
+            "categories": row["categories"] if pd.notna(row["categories"]) else "",
+            "thumbnail": row["thumbnail"] if pd.notna(row["thumbnail"]) else None,
+            "average_rating": float(row["average_rating"]) if pd.notna(row["average_rating"]) else None,
+        })
+
+    if len(results) < n:
+        remaining_needed = n - len(results)
+        fallback = get_fallback_recommendations(fallback_phrase, n=remaining_needed + len(seen_titles))
+        for book in fallback:
+            if len(results) >= n:
+                break
+            if not book["title"] or book["title"] in seen_titles:
+                continue
+            seen_titles.add(book["title"])
+            results.append(book)
 
     return results
 
@@ -108,8 +162,15 @@ def get_recommendations(title: str, n: int = 5) -> list[dict]:
     if key not in title_to_index:
         return [{"error": f"Book '{title}' not found in dataset"}]
 
-    # Get the row number of the requested book
+    # Get the row number of the requested book. Some titles appear more than
+    # once in the dataset (different editions/printings), which makes
+    # title_to_index[key] return a pandas Series instead of a single int.
+    # Deterministically take the first match so this never crashes.
     idx = title_to_index[key]
+    if isinstance(idx, pd.Series):
+        idx = int(idx.iloc[0])
+    else:
+        idx = int(idx)
 
     # Pull the similarity scores for this book against every other book,
     # then sort them highest-first — enumerate gives us (index, score) pairs
@@ -123,10 +184,11 @@ def get_recommendations(title: str, n: int = 5) -> list[dict]:
     for book_idx, _ in top_matches:
         row = df.iloc[book_idx]
         results.append({
-            "title": row["title"],
-            "authors": row["authors"],
-            "categories": row["categories"],
+            "title": row["title"]  if pd.notna(row["title"]) else "" ,
+            "authors": row["authors"] if pd.notna(row["authors"]) else "",
+            "categories": row["categories"] if pd.notna(row["categories"]) else "",
             "thumbnail": row["thumbnail"] if pd.notna(row["thumbnail"]) else None,
+            "average_rating": float(row["average_rating"]) if pd.notna(row["average_rating"]) else None
         })
 
     return results

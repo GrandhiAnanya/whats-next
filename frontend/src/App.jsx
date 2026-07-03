@@ -9,7 +9,8 @@ import WhatsNext from './WhatsNext'
 import Popular from './Popular'
 
 // Genre mood pills the user can click to quickly fill in the search box
-const GENRES = ['Fiction', 'Mystery', 'Biography', 'Sci-Fi', 'Romance']
+// Genre mood pills the user can click to get instant recommendations for that genre
+const GENRES = ['Fiction', 'Mystery', 'Biography', 'Sci-Fi', 'Romance', 'Thriller', 'Adventure']
 
 // ── Navbar ────────────────────────────────────────────────────────────────────
 function Navbar({ user, onSignOut, onProfile, onLibrary, onWhatsNext, onPopular }) {
@@ -134,6 +135,8 @@ function App() {
   const [isFetchingGoogle, setIsFetchingGoogle] = useState(false)
   const [justSelected, setJustSelected] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('')
+  const [genreMode, setGenreMode] = useState(false)
+  const [selectedGenre, setSelectedGenre] = useState('')
   // ── Auth listener ─────────────────────────────────────────────────────────
   // onAuthStateChanged fires whenever the user signs in or out — keeps `user` in sync
   useEffect(() => {
@@ -325,10 +328,36 @@ function App() {
 
   // Called when the user clicks "Get Recommendations" or "Show More"
   // async/await lets us write async code that reads like normal sequential code
+  // Called when the user clicks a genre pill or "Show More" under genre results.
+  // Hits our own backend now, so results come from the TF-IDF dataset instead
+  // of Google Books — no API key needed here anymore.
+  async function fetchGenreRecommendations(genre, count = 8) {
+    setLoading(true)
+    setError('')
+    setRecommendations([])
+    setResultCount(count)
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/recommendations/genre?genre=${encodeURIComponent(genre)}&n=${count}`
+      )
+      const data = await res.json()
+      if (data.length === 0) {
+        setError(`Couldn't find any ${genre} recommendations. Try another genre.`)
+      } else {
+        setRecommendations(data)
+      }
+    } catch {
+      setError('Could not reach the server. Make sure the backend is running.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function fetchRecommendations(count = 5) {
     if (!title.trim()) return
     setLoading(true)
     setError('')
+    setGenreMode(false)
     setRecommendations([])
     setResultCount(count)
     if (count === 5) {
@@ -360,9 +389,17 @@ function App() {
     }
   }
 
-  // When a genre pill is clicked, put that genre name in the search box
   function handleGenrePill(genre) {
-    setTitle(genre)
+    setTitle('')
+    setDisplayValue('')
+    setSuggestions([])
+    setShowDropdown(false)
+    setJustSelected(false)
+    setAuthorBooks([])
+    setSimilarBooks([])
+    setGenreMode(true)
+    setSelectedGenre(genre)
+    fetchGenreRecommendations(genre, 8)
   }
 
   return (
@@ -392,7 +429,7 @@ function App() {
               type="text"
               placeholder="e.g. Gilead, The Alchemist..."
               value={displayValue}
-              onChange={(e) => { setTitle(e.target.value); setDisplayValue(e.target.value); setSelectedAuthor(''); setSelectedCategory('') }}
+              onChange={(e) => { setTitle(e.target.value); setDisplayValue(e.target.value); setSelectedAuthor(''); setSelectedCategory(''); setGenreMode(false) }}
               onKeyDown={(e) => e.key === 'Enter' && fetchRecommendations(5)}
               onFocus={() => title.length >= 3 && setShowDropdown(true)}
               onBlur={() => {
@@ -502,7 +539,7 @@ function App() {
         {/* ── Results grid ── */}
         {recommendations.length > 0 && (
           <div>
-            <h2 style={styles.resultsHeading}>Your Next Reads</h2>
+            <h2 style={styles.resultsHeading}>{genreMode ? `Your Next ${selectedGenre} Reads` : 'Your Next Reads'}</h2>
             <div style={styles.grid}>
               {recommendations.map((book, i) => (
                 <BookCard
@@ -517,7 +554,7 @@ function App() {
               <div style={{ textAlign: 'center', marginTop: '24px' }}>
                 <button
                   style={styles.showMoreButton}
-                  onClick={() => fetchRecommendations(resultCount + 5)}
+                  onClick={() => genreMode ? fetchGenreRecommendations(selectedGenre, resultCount + 8) : fetchRecommendations(resultCount + 5)}
                 >
                   Show More
                 </button>
@@ -526,7 +563,7 @@ function App() {
           </div>
         )}
 
-        {authorBooks.length > 0 && (
+        {!genreMode && authorBooks.length > 0 && (
           <div>
             <h2 style={styles.resultsHeading}>More from {selectedAuthor || recommendations[0]?.authors}</h2>
             <div style={styles.grid}>
@@ -556,7 +593,7 @@ function App() {
           </div>
         )}
 
-        {similarBooks.length > 0 && (
+        {!genreMode && similarBooks.length > 0 && (
           <div>
             <h2 style={styles.resultsHeading}>More like this</h2>
             <div style={styles.grid}>
