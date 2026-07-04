@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { db } from './firebase'
-import { collectionGroup, getDocs } from 'firebase/firestore'
+import { collectionGroup, getDocs, collection, doc, setDoc, serverTimestamp } from 'firebase/firestore'
 
-function PopularCard({ book }) {
+function PopularCard({ book, savedBooks, onSave }) {
+  const isSaved = savedBooks.includes(book.title)
   return (
     <div style={styles.card}>
       {book.thumbnail ? (
@@ -20,12 +21,21 @@ function PopularCard({ book }) {
             <span style={styles.rating}>★ {book.avgRating}</span>
           )}
         </div>
+        {isSaved ? (
+          <button style={styles.savedButton} disabled>Saved ✓</button>
+        ) : (
+          <div style={styles.buttonRow}>
+            <button style={styles.actionButton} onClick={() => onSave(book, 'read')}>Mark as Read</button>
+            <button style={styles.actionButton} onClick={() => onSave(book, 'want_to_read')}>Want to Read</button>
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-function RatedCard({ book }) {
+function RatedCard({ book, savedBooks, onSave }) {
+  const isSaved = savedBooks.includes(book.title)
   return (
     <div style={styles.card}>
       {book.thumbnail ? (
@@ -41,16 +51,25 @@ function RatedCard({ book }) {
           <span style={styles.ratedBadge}>Rated by {book.ratingCount} reader{book.ratingCount !== 1 ? 's' : ''}</span>
           <span style={styles.rating}>★ {book.avgRating}</span>
         </div>
+        {isSaved ? (
+          <button style={styles.savedButton} disabled>Saved ✓</button>
+        ) : (
+          <div style={styles.buttonRow}>
+            <button style={styles.actionButton} onClick={() => onSave(book, 'read')}>Mark as Read</button>
+            <button style={styles.actionButton} onClick={() => onSave(book, 'want_to_read')}>Want to Read</button>
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-export default function Popular({ onBack }) {
+export default function Popular({ user, onBack }) {
   const [popular, setPopular] = useState([])
   const [highlyRated, setHighlyRated] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [savedBooks, setSavedBooks] = useState([])
 
   useEffect(() => {
     async function load() {
@@ -126,6 +145,29 @@ export default function Popular({ onBack }) {
     load()
   }, [])
 
+  useEffect(() => {
+    if (!user?.uid) return
+    async function fetchSaved() {
+      const snapshot = await getDocs(collection(db, 'users', user.uid, 'library'))
+      setSavedBooks(snapshot.docs.map((d) => d.data().title))
+    }
+    fetchSaved()
+  }, [user?.uid])
+
+  async function saveBook(book, status) {
+    const bookDoc = doc(db, 'users', user.uid, 'library', book.title)
+    await setDoc(bookDoc, {
+      title: book.title,
+      authors: book.authors,
+      thumbnail: book.thumbnail || null,
+      categories: book.categories || null,
+      status,
+      rating: null,
+      addedAt: serverTimestamp(),
+    })
+    setSavedBooks((prev) => [...prev, book.title])
+  }
+
   return (
     <div style={styles.page}>
       <div style={styles.header}>
@@ -147,7 +189,7 @@ export default function Popular({ onBack }) {
             <h2 style={styles.resultsHeading}>most saved across all readers</h2>
             <div style={styles.grid}>
               {popular.map((book, i) => (
-                <PopularCard key={i} book={book} />
+                <PopularCard key={i} book={book} savedBooks={savedBooks} onSave={saveBook} />
               ))}
             </div>
           </div>
@@ -163,7 +205,7 @@ export default function Popular({ onBack }) {
             ) : (
               <div style={styles.grid}>
                 {highlyRated.map((book, i) => (
-                  <RatedCard key={i} book={book} />
+                  <RatedCard key={i} book={book} savedBooks={savedBooks} onSave={saveBook} />
                 ))}
               </div>
             )}
@@ -245,6 +287,7 @@ const styles = {
     borderRadius: '16px',
     overflow: 'hidden',
     textAlign: 'left',
+    width: '200px',
   },
   thumbnail: {
     width: '100%',
@@ -266,12 +309,12 @@ const styles = {
   },
   cardTitle: {
     fontWeight: '500',
-    fontSize: '0.95rem',
+    fontSize: '0.82rem',
     marginBottom: '4px',
     color: '#3D3A36',
   },
   cardMeta: {
-    fontSize: '0.8rem',
+    fontSize: '0.75rem',
     color: '#8B775E',
     margin: '2px 0',
   },
@@ -304,5 +347,33 @@ const styles = {
   rating: {
     fontSize: '0.85rem',
     color: '#C9AE7C',
+  },
+  buttonRow: {
+    display: 'flex',
+    gap: '6px',
+    marginTop: '10px',
+    flexWrap: 'wrap',
+  },
+  actionButton: {
+    padding: '6px 12px',
+    fontSize: '0.75rem',
+    backgroundColor: '#6F5B47',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '50px',
+    cursor: 'pointer',
+    fontFamily: "'Lora', serif",
+  },
+  savedButton: {
+    marginTop: '10px',
+    padding: '6px 14px',
+    fontSize: '0.75rem',
+    backgroundColor: 'transparent',
+    color: '#8B775E',
+    border: '1px solid #EADBCF',
+    borderRadius: '50px',
+    cursor: 'default',
+    fontFamily: "'Lora', serif",
+    width: '100%',
   },
 }

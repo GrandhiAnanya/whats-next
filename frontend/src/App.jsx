@@ -295,9 +295,10 @@ function App() {
     const rawCategory = selectedCategory || firstBook.categories || ''
     const mappedGenre = mapToGenre(rawCategory)
     const similarQuery = `subject:"${mappedGenre}"`
+    const similarPoolSize = Math.min(Math.max(similarN * 4, 20), 40)
     const [authorRes, subjectRes] = await Promise.all([
       fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${encodeURIComponent(authorQuery)}"&maxResults=${authorN}&orderBy=newest&key=${API_KEY}`),
-      fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(similarQuery)}&maxResults=${similarN}&orderBy=relevance&printType=books&key=${API_KEY}`),
+      fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(similarQuery)}&maxResults=${similarPoolSize}&orderBy=relevance&printType=books&key=${API_KEY}`),
     ])
     const [authorData, subjectData] = await Promise.all([authorRes.json(), subjectRes.json()])
 
@@ -318,8 +319,14 @@ function App() {
         authors: item.volumeInfo?.authors?.join(', ') || '',
         categories: item.volumeInfo?.categories?.join(', ') || '',
         thumbnail: item.volumeInfo?.imageLinks?.thumbnail || null,
+        publishedDate: item.volumeInfo?.publishedDate || '',
       }))
       .filter(book => book.title.toLowerCase().trim() !== searchedTitle)
+      // Newest first within the relevance-ranked pool. Books with no date
+      // (missing metadata) sort to the end rather than being treated as newest.
+      .sort((a, b) => (b.publishedDate || '0000').localeCompare(a.publishedDate || '0000'))
+      .slice(0, similarN)
+      .map(({ publishedDate, ...book }) => book)
       
 
     setAuthorBooks(authorMapped)
