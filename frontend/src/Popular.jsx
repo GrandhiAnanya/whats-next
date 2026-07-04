@@ -96,7 +96,7 @@ export default function Popular({ user, onBack }) {
           if (data.rating != null) {
             bookMap[data.title].ratings.push(data.rating)
           }
-          if (data.rating != null && data.rating >= 3 && data.status === 'read') {
+          if (data.rating != null ) {
             if (!ratingMap[data.title]) {
               ratingMap[data.title] = {
                 title: data.title,
