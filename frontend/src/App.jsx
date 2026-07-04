@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useIsMobile } from './useIsMobile'
 import { auth, db } from './firebase'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { collection, setDoc, getDocs, doc } from 'firebase/firestore'
@@ -15,6 +16,7 @@ const GENRES = ['Fiction', 'Mystery', 'Biography', 'Sci-Fi', 'Romance', 'Thrille
 // ── Navbar ────────────────────────────────────────────────────────────────────
 function Navbar({ user, onSignOut, onProfile, onLibrary, onWhatsNext, onPopular }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const isMobile = useIsMobile()
   const avatarRef = useRef(null)
 
   // Close the dropdown when the user clicks anywhere outside the avatar area
@@ -36,7 +38,7 @@ function Navbar({ user, onSignOut, onProfile, onLibrary, onWhatsNext, onPopular 
     '?'
 
   return (
-    <nav style={styles.navbar}>
+    <nav style={{ ...styles.navbar, padding: isMobile ? '12px 20px' : '22px 48px', boxSizing: 'border-box' }}>
       {/* ── Avatar button + dropdown (left side) ── */}
       <div ref={avatarRef} style={{ position: 'relative' }}>
         <button
@@ -64,10 +66,10 @@ function Navbar({ user, onSignOut, onProfile, onLibrary, onWhatsNext, onPopular 
       </div>
 
       {/* ── Nav links (right side) ── */}
-      <div style={styles.navLinks}>
-        <span style={{ ...styles.navLink, cursor: 'pointer' }} onClick={onLibrary}> My Library </span>
-        <span style={{ ...styles.navLink, cursor: 'pointer' }} onClick={onWhatsNext}>What's Next</span>
-        <span style={{ ...styles.navLink, cursor: 'pointer' }} onClick={onPopular}>Popular</span>
+      <div style={{ ...styles.navLinks, gap: isMobile ? '14px' : '28px' }}>
+        <span style={{ ...styles.navLink, cursor: 'pointer', fontSize: isMobile ? '0.8rem' : '0.95rem' }} onClick={onLibrary}>My Library</span>
+        <span style={{ ...styles.navLink, cursor: 'pointer', fontSize: isMobile ? '0.8rem' : '0.95rem' }} onClick={onWhatsNext}>What's Next</span>
+        <span style={{ ...styles.navLink, cursor: 'pointer', fontSize: isMobile ? '0.8rem' : '0.95rem' }} onClick={onPopular}>Popular</span>
       </div>
     </nav>
   )
@@ -137,6 +139,7 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [genreMode, setGenreMode] = useState(false)
   const [selectedGenre, setSelectedGenre] = useState('')
+  const isMobile = useIsMobile()
   // ── Auth listener ─────────────────────────────────────────────────────────
   // onAuthStateChanged fires whenever the user signs in or out — keeps `user` in sync
   useEffect(() => {
@@ -420,16 +423,16 @@ function App() {
         onPopular={() => setShowPopular(true)}
       />
 
-      <main style={styles.main}>
+      <main style={{ ...styles.main, padding: isMobile ? '32px 20px' : '60px 80px' }}>
         {/* ── Page heading ── */}
-        <h1 style={styles.heading}>What's Next?</h1>
+        <h1 style={{ ...styles.heading, fontSize: isMobile ? '2.4rem' : '3.8rem' }}>What's Next?</h1>
         <br></br>
-        <p style={styles.subheading}>
+        <p style={{ ...styles.subheading, fontSize: isMobile ? '1rem' : '1.2rem' }}>
           Enter a book you've enjoyed and we'll find your next read.
         </p>
 
         {/* ── Search bar ── */}
-        <div style={styles.searchRow}>
+        <div style={{ ...styles.searchRow, flexDirection: isMobile ? 'column' : 'row' }}>
           <div style={{ position: 'relative', flex: 1 }}>
             <input
               style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }}
@@ -694,6 +697,7 @@ const styles = {
     maxWidth: '1000px',
     margin: '0 auto',
     width: '100%',
+    boxSizing: 'border-box',
   },
   navLinks: {
     display: 'flex',
@@ -789,7 +793,7 @@ const styles = {
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
     gap: '20px',
   },
   card: {

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useIsMobile } from './useIsMobile'
 import { auth } from './firebase'
 import {
   signInWithPopup,
@@ -11,6 +12,7 @@ import {
 // ── Auth component ────────────────────────────────────────────────────────────
 // Handles sign-up, sign-in (email/password), and Google sign-in
 function Auth() {
+  const isMobile = useIsMobile()
   // ── State ──────────────────────────────────────────────────────────────────
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
@@ -56,7 +58,7 @@ function Auth() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={styles.page}>
-    <div style={styles.container}>
+    <div style={{ ...styles.container, padding: isMobile ? '40px 24px' : '60px 56px' }}>
       <h2 style={styles.heading}>{isSignUp ? 'Create an Account' : 'Welcome Back'}</h2>
       <p style={styles.subheading}>{isSignUp ? 'Join to save your library.' : 'Sign in to your library.'}</p>
 

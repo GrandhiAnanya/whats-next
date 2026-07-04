@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { useIsMobile } from './useIsMobile'
 import { auth } from './firebase'
 import { sendPasswordResetEmail, updateProfile, updateEmail } from 'firebase/auth'
 
 function Profile({ user, onBack }) {
+  const isMobile = useIsMobile()
   // Locally tracked committed values — user prop won't auto-update after profile edits
   const [currentName, setCurrentName] = useState(user?.displayName || '')
   const [currentEmail, setCurrentEmail] = useState(user?.email || '')
@@ -56,25 +58,27 @@ function Profile({ user, onBack }) {
   }
 
   return (
-    <div style={styles.page}>
+    <div style={{ ...styles.page, padding: isMobile ? '24px 20px' : '40px 32px' }}>
       <div style={styles.backRow}>
         <button style={styles.backButton} onClick={onBack}>← Back</button>
       </div>
 
       <div style={styles.cardWrapper}>
-        {/* Left decorative vine */}
-        <svg style={styles.vineLeft} width="50" height="320" viewBox="0 0 50 320" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M 25 0 Q 5 40 25 80 Q 45 120 25 160 Q 5 200 25 240 Q 45 280 25 320" stroke="#C9AE7C" strokeWidth="1.5" fill="none"/>
-          <circle cx="14" cy="40" r="3" fill="#C9AE7C"/>
-          <circle cx="36" cy="80" r="3" fill="#C9AE7C"/>
-          <circle cx="14" cy="120" r="3" fill="#C9AE7C"/>
-          <circle cx="36" cy="160" r="3" fill="#C9AE7C"/>
-          <circle cx="14" cy="200" r="3" fill="#C9AE7C"/>
-          <circle cx="36" cy="240" r="3" fill="#C9AE7C"/>
-          <circle cx="14" cy="280" r="3" fill="#C9AE7C"/>
-        </svg>
+        {/* Left decorative vine — hidden on mobile to prevent horizontal overflow */}
+        {!isMobile && (
+          <svg style={styles.vineLeft} width="50" height="320" viewBox="0 0 50 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 25 0 Q 5 40 25 80 Q 45 120 25 160 Q 5 200 25 240 Q 45 280 25 320" stroke="#C9AE7C" strokeWidth="1.5" fill="none"/>
+            <circle cx="14" cy="40" r="3" fill="#C9AE7C"/>
+            <circle cx="36" cy="80" r="3" fill="#C9AE7C"/>
+            <circle cx="14" cy="120" r="3" fill="#C9AE7C"/>
+            <circle cx="36" cy="160" r="3" fill="#C9AE7C"/>
+            <circle cx="14" cy="200" r="3" fill="#C9AE7C"/>
+            <circle cx="36" cy="240" r="3" fill="#C9AE7C"/>
+            <circle cx="14" cy="280" r="3" fill="#C9AE7C"/>
+          </svg>
+        )}
 
-        <div style={styles.card}>
+        <div style={{ ...styles.card, padding: isMobile ? '32px 24px' : '48px' }}>
           {/* Avatar */}
           <div style={styles.avatarSection}>
             {user?.photoURL ? (
@@ -145,17 +149,19 @@ function Profile({ user, onBack }) {
           </div>
         </div>
 
-        {/* Right decorative vine (mirror of left) */}
-        <svg style={styles.vineRight} width="50" height="320" viewBox="0 0 50 320" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M 25 0 Q 45 40 25 80 Q 5 120 25 160 Q 45 200 25 240 Q 5 280 25 320" stroke="#C9AE7C" strokeWidth="1.5" fill="none"/>
-          <circle cx="36" cy="40" r="3" fill="#C9AE7C"/>
-          <circle cx="14" cy="80" r="3" fill="#C9AE7C"/>
-          <circle cx="36" cy="120" r="3" fill="#C9AE7C"/>
-          <circle cx="14" cy="160" r="3" fill="#C9AE7C"/>
-          <circle cx="36" cy="200" r="3" fill="#C9AE7C"/>
-          <circle cx="14" cy="240" r="3" fill="#C9AE7C"/>
-          <circle cx="36" cy="280" r="3" fill="#C9AE7C"/>
-        </svg>
+        {/* Right decorative vine (mirror of left) — hidden on mobile */}
+        {!isMobile && (
+          <svg style={styles.vineRight} width="50" height="320" viewBox="0 0 50 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 25 0 Q 45 40 25 80 Q 5 120 25 160 Q 45 200 25 240 Q 5 280 25 320" stroke="#C9AE7C" strokeWidth="1.5" fill="none"/>
+            <circle cx="36" cy="40" r="3" fill="#C9AE7C"/>
+            <circle cx="14" cy="80" r="3" fill="#C9AE7C"/>
+            <circle cx="36" cy="120" r="3" fill="#C9AE7C"/>
+            <circle cx="14" cy="160" r="3" fill="#C9AE7C"/>
+            <circle cx="36" cy="200" r="3" fill="#C9AE7C"/>
+            <circle cx="14" cy="240" r="3" fill="#C9AE7C"/>
+            <circle cx="36" cy="280" r="3" fill="#C9AE7C"/>
+          </svg>
+        )}
       </div>
     </div>
   )

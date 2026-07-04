@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useIsMobile } from './useIsMobile'
 import { db } from './firebase'
 import { collectionGroup, getDocs, collection, doc, setDoc, serverTimestamp } from 'firebase/firestore'
 
@@ -65,6 +66,7 @@ function RatedCard({ book, savedBooks, onSave }) {
 }
 
 export default function Popular({ user, onBack }) {
+  const isMobile = useIsMobile()
   const [popular, setPopular] = useState([])
   const [highlyRated, setHighlyRated] = useState([])
   const [loading, setLoading] = useState(true)
@@ -170,12 +172,12 @@ export default function Popular({ user, onBack }) {
 
   return (
     <div style={styles.page}>
-      <div style={styles.header}>
+      <div style={{ ...styles.header, padding: isMobile ? '14px 20px' : '22px 48px' }}>
         <button style={styles.backButton} onClick={onBack}>← Back</button>
         <h1 style={styles.heading}>Popular</h1>
       </div>
 
-      <main style={styles.main}>
+      <main style={{ ...styles.main, padding: isMobile ? '24px 20px' : '48px' }}>
         {loading && <p style={styles.feedback}>Finding popular books...</p>}
 
         {!loading && (error || popular.length === 0) && (
@@ -278,7 +280,7 @@ const styles = {
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
     gap: '20px',
   },
   card: {
@@ -287,7 +289,6 @@ const styles = {
     borderRadius: '16px',
     overflow: 'hidden',
     textAlign: 'left',
-    width: '200px',
   },
   thumbnail: {
     width: '100%',

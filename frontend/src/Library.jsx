@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useIsMobile } from './useIsMobile'
 import { db } from './firebase'
 import {
   doc, setDoc, updateDoc, deleteDoc, getDocs, collection,
@@ -33,6 +34,7 @@ function StarPicker({ value, onChange }) {
 
 // ── Library ───────────────────────────────────────────────────────────────────
 function Library({ user, onBack }) {
+  const isMobile = useIsMobile()
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [searchLoading, setSearchLoading] = useState(false)
@@ -128,7 +130,7 @@ function Library({ user, onBack }) {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={styles.page}>
-      <div style={styles.header}>
+      <div style={{ ...styles.header, padding: isMobile ? '14px 20px' : '22px 48px' }}>
         <button style={styles.backButton} onClick={onBack}>← Back</button>
         <h1 style={styles.heading}>My Library</h1>
       </div>
@@ -136,7 +138,7 @@ function Library({ user, onBack }) {
       {/* ════════════════════════════════════════════════════════════════════
           SECTION 1 — Search and add books
       ════════════════════════════════════════════════════════════════════ */}
-      <div style={styles.section}>
+      <div style={{ ...styles.section, padding: isMobile ? '0 20px 32px' : '0 48px 52px' }}>
         <div style={styles.searchRow}>
           <input
             style={styles.input}
@@ -229,7 +231,7 @@ function Library({ user, onBack }) {
       {/* ════════════════════════════════════════════════════════════════════
           SECTION 2 — Read shelf
       ════════════════════════════════════════════════════════════════════ */}
-      <div style={styles.section}>
+      <div style={{ ...styles.section, padding: isMobile ? '0 20px 32px' : '0 48px 52px' }}>
         <h2 style={styles.shelfHeading}>Books I've Read</h2>
         {readBooks.length === 0 ? (
           <p style={styles.hint}>Nothing here yet — search above to add books.</p>
@@ -266,7 +268,7 @@ function Library({ user, onBack }) {
       {/* ════════════════════════════════════════════════════════════════════
           SECTION 3 — Want to Read shelf
       ════════════════════════════════════════════════════════════════════ */}
-      <div style={styles.section}>
+      <div style={{ ...styles.section, padding: isMobile ? '0 20px 32px' : '0 48px 52px' }}>
         <h2 style={styles.shelfHeading}>Want to Read</h2>
         {wantBooks.length === 0 ? (
           <p style={styles.hint}>Nothing on your reading list yet.</p>
@@ -511,7 +513,7 @@ const styles = {
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
     gap: '16px',
   },
   card: {

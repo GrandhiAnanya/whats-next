@@ -109,3 +109,6 @@ code {
   padding: 4px 8px;
   background: transparent;
 }
+
+/* Suppress the webkit scrollbar on WhatsNext carousels (Firefox uses scrollbar-width inline) */
+.carousel-row::-webkit-scrollbar { display: none; }

@@ -74,6 +74,11 @@
         90%  { opacity: 0.8; }
         100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
       }
+
+      /* Hide decorative vines on small screens — they eat ~140px on each side */
+      @media (max-width: 640px) {
+        .vine-left, .vine-right { display: none; }
+      }
     </style>
   </head>
   <body>

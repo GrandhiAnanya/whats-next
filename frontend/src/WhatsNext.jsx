@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useIsMobile } from './useIsMobile'
 import { db } from './firebase'
 import { collection, getDocs, setDoc, doc } from 'firebase/firestore'
 
@@ -28,6 +29,7 @@ function BookCard({ book, onSave, isSaved }) {
 
 export default function WhatsNext({ user, onBack }) {
   // Each entry: { readBook, results, loading }
+  const isMobile = useIsMobile()
   const [sections, setSections] = useState([])
   const [library, setLibrary] = useState([])
   const [initialLoading, setInitialLoading] = useState(true)
@@ -120,12 +122,12 @@ export default function WhatsNext({ user, onBack }) {
 
   return (
     <div style={styles.page}>
-      <div style={styles.header}>
+      <div style={{ ...styles.header, padding: isMobile ? '14px 20px' : '22px 48px' }}>
         <button style={styles.backButton} onClick={onBack}>← Back</button>
         <h1 style={styles.heading}>What's Next?</h1>
       </div>
 
-      <main style={styles.main}>
+      <main style={{ ...styles.main, padding: isMobile ? '24px 20px' : '48px' }}>
         {initialLoading && (
           <p style={styles.feedback}>Loading your reading history...</p>
         )}
@@ -150,14 +152,15 @@ export default function WhatsNext({ user, onBack }) {
               <p style={styles.feedback}>No recommendations found for this title.</p>
             ) : (
               <div style={styles.carouselWrapper}>
-                {section.results.length > 4 && (
+                {section.results.length > 4 && !isMobile && (
                   <button
                     style={styles.arrowButton}
                     onClick={() => carouselRefs.current[i]?.scrollBy({ left: -220, behavior: 'smooth' })}
                   >←</button>
                 )}
                 <div
-                  style={styles.carousel}
+                  className="carousel-row"
+                  style={{ ...styles.carousel, overflowX: isMobile ? 'auto' : 'hidden' }}
                   ref={(el) => (carouselRefs.current[i] = el)}
                 >
                   {section.results.map((book, j) => (
@@ -169,7 +172,7 @@ export default function WhatsNext({ user, onBack }) {
                     />
                   ))}
                 </div>
-                {section.results.length > 4 && (
+                {section.results.length > 4 && !isMobile && (
                   <button
                     style={styles.arrowButton}
                     onClick={() => carouselRefs.current[i]?.scrollBy({ left: 220, behavior: 'smooth' })}
@@ -275,9 +278,11 @@ const styles = {
   carousel: {
     display: 'flex',
     flexDirection: 'row',
-    overflow: 'hidden',
+    overflowX: 'hidden',
     gap: '20px',
     flex: 1,
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
   },
   arrowButton: {
     width: '40px',
